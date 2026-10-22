@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Import Students</title>
+</head>
+<body>
+    <h1>Import Students</h1>
+    <p>Upload a UTF-8 CSV or .xlsx file no larger than 5 MB.</p>
+    <p>Required columns: name, class, roll_number, contact_details. Optional column: section.</p>
+    {% if error %}
+        <p role="alert">{{ error }}</p>
+    {% endif %}
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <label for="file">Student file:</label>
+        <input id="file" type="file" name="file" accept=".csv,.xlsx" required>
+        <button type="submit">Import</button>
+    </form>
+    <p><a href="{% url 'students:list' %}">Back to students</a></p>
+</body>
+</html>

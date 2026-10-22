@@ -14,6 +14,7 @@
         </ul>
     {% endif %}
     <a href="{% url 'students:create' %}">Create Student</a>
+    <a href="{% url 'students:import' %}">Import Students</a>
     <ul>
         {% for student in students %}
             <li>

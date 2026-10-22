@@ -7,6 +7,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods
 
 from accounts.models import User
+from .bulk_import import BulkImportError, import_students
 from .forms import AcademicClassForm, SectionForm, StudentForm, SubjectForm
 from .models import AcademicClass, Section, Student, Subject
 
@@ -94,6 +95,32 @@ def student_delete(request, pk):
     student.delete()
     messages.success(request, "Student profile deleted successfully.")
     return redirect("students:list")
+
+
+@login_required(login_url="login")
+@_admin_required
+@require_http_methods(["GET", "POST"])
+def student_bulk_import(request):
+    if request.method == "POST":
+        uploaded_file = request.FILES.get("file")
+        if uploaded_file is None:
+            return render(
+                request,
+                "students/student_import.html",
+                {"error": "Select a CSV or .xlsx file to upload."},
+            )
+        try:
+            imported_count = import_students(uploaded_file)
+        except BulkImportError as exc:
+            return render(
+                request,
+                "students/student_import.html",
+                {"error": str(exc)},
+                status=400,
+            )
+        messages.success(request, f"{imported_count} student profiles imported successfully.")
+        return redirect("students:list")
+    return render(request, "students/student_import.html")
 
 
 def _catalog_views(model, form_class, title, list_name):
