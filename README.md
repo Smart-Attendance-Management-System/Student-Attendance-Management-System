@@ -21,3 +21,15 @@ python manage.py runserver
 
 Student profiles are managed under `/students/`.
 Only users with role `ADMIN` can create, update, or delete profiles.
+
+## Academic structure management
+
+Admins can manage academic classes, sections, and subjects under:
+
+- `/classes/`
+- `/sections/`
+- `/subjects/`
+
+Sections belong to an academic class and cannot be deleted while students
+reference them. Student profiles can select a managed section while retaining
+support for existing class values.
