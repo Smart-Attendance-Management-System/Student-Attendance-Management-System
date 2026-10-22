@@ -50,6 +50,7 @@ urlpatterns = [
     path('students/', include(([
         path('', student_views.student_list, name='list'),
         path('create/', student_views.student_create, name='create'),
+        path('import/', student_views.student_bulk_import, name='import'),
         path('<int:pk>/', student_views.student_detail, name='detail'),
         path('<int:pk>/update/', student_views.student_update, name='update'),
         path('<int:pk>/delete/', student_views.student_delete, name='delete'),
