@@ -21,6 +21,11 @@ python manage.py runserver
 
 Student profiles are managed under `/students/`.
 Only users with role `ADMIN` can create, update, or delete profiles.
+Admins can bulk import students from `/students/import/`.
+Imports accept UTF-8 `.csv` and `.xlsx` files up to 5 MB.
+Required columns are `name`, `class`, `roll_number`, and `contact_details`;
+`section` is optional and must belong to the specified class.
+Imports are all-or-nothing: if any row is invalid, no students are saved.
 
 ## Academic structure management
 

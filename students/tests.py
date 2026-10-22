@@ -1,7 +1,12 @@
+import csv
+from io import BytesIO, StringIO
+
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.urls import reverse
+from openpyxl import Workbook
 
 from .models import AcademicClass, Section, Student, Subject
 
@@ -266,3 +271,251 @@ class ClassSectionSubjectTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertTrue(Section.objects.filter(pk=section.pk).exists())
         self.assertTrue(Student.objects.filter(pk=student.pk).exists())
+
+
+class BulkStudentImportTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            username="import-admin",
+            password="adminpass123",
+            role=User.Role.ADMIN,
+        )
+        self.teacher = User.objects.create_user(
+            username="import-teacher",
+            password="teacherpass123",
+            role=User.Role.TEACHER,
+        )
+        self.academic_class = AcademicClass.objects.create(name="Grade 10")
+        self.section = Section.objects.create(
+            academic_class=self.academic_class,
+            name="A",
+        )
+
+    def csv_file(self, rows, name="students.csv"):
+        output = StringIO()
+        writer = csv.DictWriter(
+            output,
+            fieldnames=["name", "class", "section", "roll_number", "contact_details"],
+        )
+        writer.writeheader()
+        writer.writerows(rows)
+        return SimpleUploadedFile(
+            name,
+            output.getvalue().encode("utf-8"),
+            content_type="text/csv",
+        )
+
+    def excel_file(self, rows, name="students.xlsx"):
+        workbook = Workbook()
+        worksheet = workbook.active
+        worksheet.append(["name", "class", "section", "roll_number", "contact_details"])
+        for row in rows:
+            worksheet.append(
+                [
+                    row["name"],
+                    row["class"],
+                    row.get("section", ""),
+                    row["roll_number"],
+                    row["contact_details"],
+                ]
+            )
+        content = BytesIO()
+        workbook.save(content)
+        return SimpleUploadedFile(
+            name,
+            content.getvalue(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+    def test_admin_can_import_valid_csv(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse("students:import"),
+            {
+                "file": self.csv_file(
+                    [
+                        {
+                            "name": "CSV Student",
+                            "class": "Grade 10",
+                            "section": "A",
+                            "roll_number": "101",
+                            "contact_details": "csv@example.com",
+                        }
+                    ]
+                )
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        student = Student.objects.get(roll_number=101)
+        self.assertEqual(student.section, self.section)
+        self.assertEqual(student.student_class, "Grade 10")
+
+    def test_admin_can_import_supported_excel_file(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse("students:import"),
+            {
+                "file": self.excel_file(
+                    [
+                        {
+                            "name": "Excel Student",
+                            "class": "Grade 10",
+                            "section": "A",
+                            "roll_number": 102,
+                            "contact_details": "excel@example.com",
+                        }
+                    ]
+                )
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(Student.objects.filter(roll_number=102).exists())
+
+    def test_empty_file_is_rejected_without_writes(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse("students:import"),
+            {"file": SimpleUploadedFile("empty.csv", b"", content_type="text/csv")},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(Student.objects.count(), 0)
+
+    def test_unsupported_file_type_is_rejected(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse("students:import"),
+            {
+                "file": SimpleUploadedFile(
+                    "students.txt",
+                    b"name,class,roll_number,contact_details\nA,Grade 10,103,a@example.com",
+                    content_type="text/plain",
+                )
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(response, "CSV file or an .xlsx Excel file", status_code=400)
+
+    def test_missing_headers_and_invalid_values_are_rejected(self):
+        self.client.force_login(self.admin)
+        missing_headers = SimpleUploadedFile(
+            "missing.csv",
+            b"name,class\nStudent,Grade 10",
+            content_type="text/csv",
+        )
+        response = self.client.post(
+            reverse("students:import"),
+            {"file": missing_headers},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(response, "Required columns are missing", status_code=400)
+        self.assertEqual(Student.objects.count(), 0)
+
+        response = self.client.post(
+            reverse("students:import"),
+            {
+                "file": self.csv_file(
+                    [
+                        {
+                            "name": "Invalid Student",
+                            "class": "Grade 10",
+                            "section": "A",
+                            "roll_number": "not-a-number",
+                            "contact_details": "invalid@example.com",
+                        }
+                    ],
+                    name="invalid.csv",
+                )
+            },
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(Student.objects.count(), 0)
+
+    def test_duplicate_roll_numbers_are_rejected_atomically(self):
+        existing = Student.objects.create(
+            name="Existing Student",
+            student_class="Grade 10",
+            roll_number=104,
+            contact_details="existing@example.com",
+        )
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse("students:import"),
+            {
+                "file": self.csv_file(
+                    [
+                        {
+                            "name": "New Student",
+                            "class": "Grade 10",
+                            "section": "A",
+                            "roll_number": "105",
+                            "contact_details": "new@example.com",
+                        },
+                        {
+                            "name": "Duplicate Student",
+                            "class": "Grade 10",
+                            "section": "A",
+                            "roll_number": "105",
+                            "contact_details": "duplicate@example.com",
+                        },
+                    ],
+                    name="duplicates.csv",
+                )
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(Student.objects.count(), 1)
+        self.assertTrue(Student.objects.filter(pk=existing.pk).exists())
+
+    def test_unknown_class_or_section_is_rejected_without_writes(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse("students:import"),
+            {
+                "file": self.csv_file(
+                    [
+                        {
+                            "name": "Unknown Class Student",
+                            "class": "Grade 11",
+                            "section": "A",
+                            "roll_number": "106",
+                            "contact_details": "unknown@example.com",
+                        }
+                    ],
+                    name="unknown.csv",
+                )
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(response, "was not found", status_code=400)
+        self.assertEqual(Student.objects.count(), 0)
+
+    def test_non_admin_and_unauthenticated_users_cannot_import(self):
+        upload = self.csv_file(
+            [
+                {
+                    "name": "Denied Student",
+                    "class": "Grade 10",
+                    "section": "A",
+                    "roll_number": "107",
+                    "contact_details": "denied@example.com",
+                }
+            ],
+            name="denied.csv",
+        )
+        self.client.force_login(self.teacher)
+        self.assertEqual(
+            self.client.post(reverse("students:import"), {"file": upload}).status_code,
+            403,
+        )
+
+        self.client.logout()
+        response = self.client.get(reverse("students:import"))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/accounts/login", response["Location"])
