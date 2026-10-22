@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title }}</title>
+</head>
+<body>
+    <h1>{{ title }}</h1>
+    {% if messages %}
+        <ul>
+            {% for message in messages %}
+                <li>{{ message }}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+    <p><a href="{% url create_url %}">Create</a></p>
+    <ul>
+        {% for record in records %}
+            <li>
+                <a href="{% url detail_url record.pk %}">{{ record }}</a>
+                <a href="{% url update_url record.pk %}">Edit</a>
+                <form method="post" action="{% url delete_url record.pk %}" style="display:inline;">
+                    {% csrf_token %}
+                    <button type="submit">Delete</button>
+                </form>
+            </li>
+        {% empty %}
+            <li>No records found.</li>
+        {% endfor %}
+    </ul>
+</body>
+</html>
