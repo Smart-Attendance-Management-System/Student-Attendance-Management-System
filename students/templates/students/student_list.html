@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Student Profiles</title>
+</head>
+<body>
+    <h1>Student Profiles</h1>
+    {% if messages %}
+        <ul>
+            {% for message in messages %}
+                <li>{{ message }}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+    <a href="{% url 'students:create' %}">Create Student</a>
+    <ul>
+        {% for student in students %}
+            <li>
+                {{ student.name }} - {{ student.student_class }} - Roll {{ student.roll_number }}
+                <a href="{% url 'students:detail' student.pk %}">View</a>
+                <a href="{% url 'students:update' student.pk %}">Edit</a>
+                <form method="post" action="{% url 'students:delete' student.pk %}" style="display:inline;">
+                    {% csrf_token %}
+                    <button type="submit" onclick="return confirm('Delete this student profile?')">Delete</button>
+                </form>
+            </li>
+        {% empty %}
+            <li>No student profiles found.</li>
+        {% endfor %}
+    </ul>
+</body>
+</html>
