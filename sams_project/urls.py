@@ -20,6 +20,30 @@ from django.urls import include, path
 
 from students import views as student_views
 
+classes_urlpatterns = [
+    path('', student_views.academic_class_list, name='list'),
+    path('create/', student_views.academic_class_create, name='create'),
+    path('<int:pk>/', student_views.academic_class_detail, name='detail'),
+    path('<int:pk>/update/', student_views.academic_class_update, name='update'),
+    path('<int:pk>/delete/', student_views.academic_class_delete, name='delete'),
+]
+
+sections_urlpatterns = [
+    path('', student_views.section_list, name='list'),
+    path('create/', student_views.section_create, name='create'),
+    path('<int:pk>/', student_views.section_detail, name='detail'),
+    path('<int:pk>/update/', student_views.section_update, name='update'),
+    path('<int:pk>/delete/', student_views.section_delete, name='delete'),
+]
+
+subjects_urlpatterns = [
+    path('', student_views.subject_list, name='list'),
+    path('create/', student_views.subject_create, name='create'),
+    path('<int:pk>/', student_views.subject_detail, name='detail'),
+    path('<int:pk>/update/', student_views.subject_update, name='update'),
+    path('<int:pk>/delete/', student_views.subject_delete, name='delete'),
+]
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('accounts/login/', auth_views.LoginView.as_view(), name='login'),
@@ -30,4 +54,7 @@ urlpatterns = [
         path('<int:pk>/update/', student_views.student_update, name='update'),
         path('<int:pk>/delete/', student_views.student_delete, name='delete'),
     ], 'students'), 'students')),
+    path('classes/', include((classes_urlpatterns, 'classes'), namespace='classes')),
+    path('sections/', include((sections_urlpatterns, 'sections'), namespace='sections')),
+    path('subjects/', include((subjects_urlpatterns, 'subjects'), namespace='subjects')),
 ]
