@@ -2,6 +2,67 @@ from django.core.exceptions import ValidationError
 from django.db import models
 
 
+class AcademicClass(models.Model):
+    name = models.CharField(max_length=50, unique=True)
+
+    class Meta:
+        ordering = ["name"]
+        verbose_name = "class"
+        verbose_name_plural = "classes"
+
+    def clean(self):
+        super().clean()
+        if not self.name or not self.name.strip():
+            raise ValidationError({"name": "Class name is required."})
+
+    def __str__(self):
+        return self.name
+
+
+class Section(models.Model):
+    academic_class = models.ForeignKey(
+        AcademicClass,
+        on_delete=models.PROTECT,
+        related_name="sections",
+    )
+    name = models.CharField(max_length=50)
+
+    class Meta:
+        ordering = ["academic_class__name", "name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["academic_class", "name"],
+                name="unique_class_section",
+            ),
+        ]
+
+    def clean(self):
+        super().clean()
+        if not self.name or not self.name.strip():
+            raise ValidationError({"name": "Section name is required."})
+
+    def __str__(self):
+        return f"{self.academic_class} - {self.name}"
+
+
+class Subject(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    code = models.CharField(max_length=20, unique=True, blank=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def clean(self):
+        super().clean()
+        if not self.name or not self.name.strip():
+            raise ValidationError({"name": "Subject name is required."})
+        if self.code and not self.code.strip():
+            raise ValidationError({"code": "Subject code cannot be blank."})
+
+    def __str__(self):
+        return f"{self.code} - {self.name}" if self.code else self.name
+
+
 class Student(models.Model):
     name = models.CharField(
         max_length=120,
@@ -19,6 +80,13 @@ class Student(models.Model):
     contact_details = models.TextField(
         help_text="Phone number, email, or emergency contact details.",
     )
+    section = models.ForeignKey(
+        Section,
+        on_delete=models.PROTECT,
+        related_name="students",
+        blank=True,
+        null=True,
+    )
 
     class Meta:
         ordering = ["student_class", "roll_number"]
@@ -27,6 +95,8 @@ class Student(models.Model):
 
     def clean(self):
         super().clean()
+        if self.section:
+            self.student_class = str(self.section.academic_class)
         if not self.name or not self.name.strip():
             raise ValidationError({"name": "Student name is required."})
         if not self.student_class or not self.student_class.strip():
