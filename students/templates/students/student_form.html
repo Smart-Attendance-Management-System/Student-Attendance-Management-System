@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{% if student.pk %}Update Student{% else %}Create Student{% endif %}</title>
+</head>
+<body>
+    <h1>{% if student.pk %}Update Student{% else %}Create Student{% endif %}</h1>
+
+    {% if messages %}
+        <ul>
+            {% for message in messages %}
+                <li>{{ message }}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    {% if errors %}
+        <ul>
+            {% for field, messages in errors.items %}
+                {% for message in messages %}
+                    <li>{{ field }}: {{ message }}</li>
+                {% endfor %}
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    <form method="post">
+        {% csrf_token %}
+        <p>
+            <label for="name">Name:</label><br>
+            <input id="name" type="text" name="name" value="{{ student.name|default:'' }}" required>
+        </p>
+        <p>
+            <label for="student_class">Class:</label><br>
+            <input id="student_class" type="text" name="student_class" value="{{ student.student_class|default:'' }}" required>
+        </p>
+        <p>
+            <label for="roll_number">Roll number:</label><br>
+            <input id="roll_number" type="number" name="roll_number" value="{{ student.roll_number|default:'' }}" min="1" required>
+        </p>
+        <p>
+            <label for="contact_details">Contact details:</label><br>
+            <textarea id="contact_details" name="contact_details" required>{{ student.contact_details|default:'' }}</textarea>
+        </p>
+        <button type="submit">Save</button>
+        <a href="{% url 'students:list' %}">Cancel</a>
+    </form>
+</body>
+</html>
