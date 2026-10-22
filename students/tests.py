@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import Student
+from .models import AcademicClass, Section, Student, Subject
 
 User = get_user_model()
 
@@ -139,3 +139,130 @@ class StudentProfileTests(TestCase):
         )
         with self.assertRaises(ValidationError):
             student.full_clean()
+
+
+class ClassSectionSubjectTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            username="catalog-admin",
+            password="adminpass123",
+            role=User.Role.ADMIN,
+        )
+        self.teacher = User.objects.create_user(
+            username="catalog-teacher",
+            password="teacherpass123",
+            role=User.Role.TEACHER,
+        )
+
+    def test_admin_can_create_view_update_and_delete_records(self):
+        self.client.force_login(self.admin)
+
+        class_response = self.client.post(
+            reverse("classes:create"),
+            {"name": "Grade 10"},
+        )
+        self.assertEqual(class_response.status_code, 302)
+        academic_class = AcademicClass.objects.get(name="Grade 10")
+        self.assertEqual(
+            self.client.get(reverse("classes:detail", args=[academic_class.pk])).status_code,
+            200,
+        )
+
+        section_response = self.client.post(
+            reverse("sections:create"),
+            {"academic_class": academic_class.pk, "name": "A"},
+        )
+        self.assertEqual(section_response.status_code, 302)
+        section = Section.objects.get(academic_class=academic_class, name="A")
+
+        update_response = self.client.post(
+            reverse("sections:update", args=[section.pk]),
+            {"academic_class": academic_class.pk, "name": "B"},
+        )
+        self.assertEqual(update_response.status_code, 302)
+        section.refresh_from_db()
+        self.assertEqual(section.name, "B")
+
+        subject_response = self.client.post(
+            reverse("subjects:create"),
+            {"name": "Mathematics", "code": "MATH"},
+        )
+        self.assertEqual(subject_response.status_code, 302)
+        subject = Subject.objects.get(code="MATH")
+        self.assertEqual(self.client.get(reverse("subjects:list")).status_code, 200)
+
+        self.assertEqual(
+            self.client.post(reverse("subjects:delete", args=[subject.pk])).status_code,
+            302,
+        )
+        self.assertFalse(Subject.objects.filter(pk=subject.pk).exists())
+        self.assertEqual(
+            self.client.post(reverse("sections:delete", args=[section.pk])).status_code,
+            302,
+        )
+        self.assertFalse(Section.objects.filter(pk=section.pk).exists())
+        self.assertEqual(
+            self.client.post(reverse("classes:delete", args=[academic_class.pk])).status_code,
+            302,
+        )
+        self.assertFalse(AcademicClass.objects.filter(pk=academic_class.pk).exists())
+
+    def test_duplicate_class_section_combination_is_rejected(self):
+        academic_class = AcademicClass.objects.create(name="Grade 11")
+        Section.objects.create(academic_class=academic_class, name="A")
+        self.client.force_login(self.admin)
+
+        response = self.client.post(
+            reverse("sections:create"),
+            {"academic_class": academic_class.pk, "name": "A"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "already exists")
+        self.assertEqual(Section.objects.filter(academic_class=academic_class).count(), 1)
+
+    def test_non_admin_cannot_manage_classes_sections_or_subjects(self):
+        self.client.force_login(self.teacher)
+        endpoints = (
+            ("classes:create", {"name": "Grade 12"}),
+            ("sections:create", {"academic_class": "", "name": "A"}),
+            ("subjects:create", {"name": "Physics", "code": "PHY"}),
+        )
+
+        for endpoint, data in endpoints:
+            with self.subTest(endpoint=endpoint):
+                self.assertEqual(self.client.post(reverse(endpoint), data).status_code, 403)
+
+    def test_unauthenticated_catalog_access_redirects_to_login(self):
+        for endpoint in ("classes:list", "sections:list", "subjects:list"):
+            with self.subTest(endpoint=endpoint):
+                response = self.client.get(reverse(endpoint))
+                self.assertEqual(response.status_code, 302)
+                self.assertIn("/accounts/login", response["Location"])
+
+    def test_invalid_catalog_data_is_rejected(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.post(reverse("classes:create"), {"name": ""})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "required")
+
+    def test_student_can_reference_section_and_section_deletion_is_protected(self):
+        academic_class = AcademicClass.objects.create(name="Grade 9")
+        section = Section.objects.create(academic_class=academic_class, name="A")
+        student = Student.objects.create(
+            name="Section Student",
+            student_class=str(academic_class),
+            section=section,
+            roll_number=901,
+            contact_details="student@example.com",
+        )
+
+        self.assertEqual(student.section, section)
+        self.client.force_login(self.admin)
+        response = self.client.post(reverse("sections:delete", args=[section.pk]))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(Section.objects.filter(pk=section.pk).exists())
+        self.assertTrue(Student.objects.filter(pk=student.pk).exists())
