@@ -1,9 +1,17 @@
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 
 
 class AcademicClass(models.Model):
     name = models.CharField(max_length=50, unique=True)
+    class_teacher = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="assigned_classes",
+        blank=True,
+        null=True,
+    )
 
     class Meta:
         ordering = ["name"]
@@ -14,6 +22,10 @@ class AcademicClass(models.Model):
         super().clean()
         if not self.name or not self.name.strip():
             raise ValidationError({"name": "Class name is required."})
+        if self.class_teacher and self.class_teacher.role != type(self.class_teacher).Role.TEACHER:
+            raise ValidationError(
+                {"class_teacher": "The class teacher must have the Teacher role."}
+            )
 
     def __str__(self):
         return self.name
