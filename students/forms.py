@@ -1,6 +1,9 @@
 from django import forms
+from django.contrib.auth import get_user_model
 
 from .models import AcademicClass, Section, Student, Subject
+
+User = get_user_model()
 
 
 class StudentForm(forms.ModelForm):
@@ -30,7 +33,14 @@ class StudentForm(forms.ModelForm):
 class AcademicClassForm(forms.ModelForm):
     class Meta:
         model = AcademicClass
-        fields = ("name",)
+        fields = ("name", "class_teacher")
+        labels = {"class_teacher": "Class Teacher"}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["class_teacher"].queryset = User.objects.filter(
+            role=User.Role.TEACHER
+        )
 
 
 class SectionForm(forms.ModelForm):

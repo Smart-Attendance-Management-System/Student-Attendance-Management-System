@@ -25,6 +25,11 @@ class StudentProfileTests(TestCase):
             password="teacherpass123",
             role=User.Role.TEACHER,
         )
+        self.student_parent = User.objects.create_user(
+            username="catalog-student",
+            password="test-password-123",
+            role=User.Role.STUDENT_PARENT,
+        )
         self.student = Student.objects.create(
             name="Alice Johnson",
             student_class="Grade 10",
@@ -159,6 +164,12 @@ class ClassSectionSubjectTests(TestCase):
             role=User.Role.TEACHER,
         )
 
+        self.student_parent = User.objects.create_user(
+            username="catalog-student",
+            password="test-password-123",
+            role=User.Role.STUDENT_PARENT,
+        )
+
     def test_admin_can_create_view_update_and_delete_records(self):
         self.client.force_login(self.admin)
 
@@ -211,6 +222,74 @@ class ClassSectionSubjectTests(TestCase):
             302,
         )
         self.assertFalse(AcademicClass.objects.filter(pk=academic_class.pk).exists())
+
+    def test_class_can_be_created_without_a_teacher(self):
+        academic_class = AcademicClass.objects.create(name="Unassigned Class")
+
+        self.assertIsNone(academic_class.class_teacher)
+
+    def test_class_form_only_lists_teachers_and_persists_assignment(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse("classes:create"))
+
+        self.assertContains(response, "Class Teacher")
+        form = response.context["form"]
+        self.assertIn(self.teacher, form.fields["class_teacher"].queryset)
+        self.assertNotIn(self.admin, form.fields["class_teacher"].queryset)
+        self.assertNotIn(self.student_parent, form.fields["class_teacher"].queryset)
+
+        response = self.client.post(
+            reverse("classes:create"),
+            {"name": "Teacher Class", "class_teacher": self.teacher.pk},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        academic_class = AcademicClass.objects.get(name="Teacher Class")
+        self.assertEqual(academic_class.class_teacher, self.teacher)
+
+    def test_editing_class_displays_and_changes_teacher(self):
+        replacement_teacher = User.objects.create_user(
+            username="replacement-teacher",
+            password="test-password-123",
+            role=User.Role.TEACHER,
+        )
+        academic_class = AcademicClass.objects.create(
+            name="Editable Class",
+            class_teacher=self.teacher,
+        )
+        self.client.force_login(self.admin)
+
+        response = self.client.get(
+            reverse("classes:update", args=[academic_class.pk])
+        )
+
+        self.assertEqual(
+            response.context["form"].initial["class_teacher"],
+            self.teacher.pk,
+        )
+        self.assertContains(response, self.teacher.get_username())
+
+        response = self.client.post(
+            reverse("classes:update", args=[academic_class.pk]),
+            {"name": "Editable Class", "class_teacher": replacement_teacher.pk},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        academic_class.refresh_from_db()
+        self.assertEqual(academic_class.class_teacher, replacement_teacher)
+
+    def test_model_rejects_non_teacher_class_teacher(self):
+        academic_class = AcademicClass(
+            name="Invalid Teacher Class",
+            class_teacher=self.student_parent,
+        )
+
+        with self.assertRaisesMessage(
+            ValidationError,
+            "The class teacher must have the Teacher role.",
+        ):
+            academic_class.full_clean()
 
     def test_duplicate_class_section_combination_is_rejected(self):
         academic_class = AcademicClass.objects.create(name="Grade 11")
