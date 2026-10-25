@@ -1,3 +1,229 @@
-from django.test import TestCase
+import datetime
+import json
 
-# Create your tests here.
+from django.db import IntegrityError
+from django.test import TestCase
+from django.urls import reverse
+
+from accounts.models import User
+from notifications.models import AuditLog
+from students.models import AcademicClass, Section, Student
+
+from . import services
+from .models import Attendance
+
+TODAY = "2026-10-23"
+
+
+class AttendanceTestBase(TestCase):
+    """Shared setup: one class with 3 students, its teacher, and another teacher."""
+
+    def setUp(self):
+        self.teacher = User.objects.create_user(
+            username="teacher1", password="pass12345", role=User.Role.TEACHER
+        )
+        self.other_teacher = User.objects.create_user(
+            username="teacher2", password="pass12345", role=User.Role.TEACHER
+        )
+        self.admin = User.objects.create_user(
+            username="admin1", password="pass12345", role=User.Role.ADMIN
+        )
+        self.cls = AcademicClass.objects.create(name="Grade 10", class_teacher=self.teacher)
+        section = Section.objects.create(academic_class=self.cls, name="A")
+        self.students = [
+            Student.objects.create(
+                name=f"Student {n}",
+                student_class="Grade 10",
+                roll_number=n,
+                contact_details=f"parent{n}@example.com",
+                section=section,
+            )
+            for n in (1, 2, 3)
+        ]
+
+    def post_json(self, url, payload):
+        return self.client.post(url, json.dumps(payload), content_type="application/json")
+
+    def mark_payload(self, records=None, date=TODAY):
+        if records is None:
+            records = [{"studentId": s.pk, "status": "Present"} for s in self.students]
+        return {"classId": self.cls.pk, "date": date, "records": records}
+
+
+# Unit tests
+
+class AttendanceServiceUnitTests(AttendanceTestBase):
+    def test_valid_statuses_are_accepted(self):
+        for status in ("Present", "Absent", "Late", "Excused"):
+            self.assertTrue(services.is_valid_status(status))
+
+    def test_invalid_status_is_rejected(self):
+        self.assertFalse(services.is_valid_status("Sick"))
+        self.assertFalse(services.is_valid_status(""))
+
+    def test_duplicate_check_false_before_marking(self):
+        self.assertFalse(services.attendance_exists(self.cls, datetime.date(2026, 10, 23)))
+
+    def test_duplicate_check_true_after_marking(self):
+        services.mark_attendance(self.teacher, self.cls.pk, TODAY, [])
+        self.assertTrue(services.attendance_exists(self.cls, datetime.date(2026, 10, 23)))
+
+    def test_only_assigned_teacher_counts_as_class_teacher(self):
+        self.assertTrue(services.is_class_teacher(self.teacher, self.cls))
+        self.assertFalse(services.is_class_teacher(self.other_teacher, self.cls))
+        self.assertFalse(services.is_class_teacher(self.admin, self.cls))
+
+    def test_timestamp_set_on_save_and_updated_on_edit(self):
+        entries = services.mark_attendance(self.teacher, self.cls.pk, TODAY, [])
+        record = Attendance.objects.get(pk=entries[0].pk)
+        first_update = record.updated_at
+        self.assertIsNotNone(record.created_at)
+        services.edit_attendance(self.teacher, record, "Late")
+        record.refresh_from_db()
+        self.assertGreater(record.updated_at, first_update)
+
+    def test_database_blocks_duplicate_rows(self):
+        Attendance.objects.create(
+            student=self.students[0], academic_class=self.cls,
+            date=datetime.date(2026, 10, 23), status="Present", marked_by=self.teacher,
+        )
+        with self.assertRaises(IntegrityError):
+            Attendance.objects.create(
+                student=self.students[0], academic_class=self.cls,
+                date=datetime.date(2026, 10, 23), status="Absent", marked_by=self.teacher,
+            )
+
+
+# Integration tests:
+
+class MarkAttendanceApiTests(AttendanceTestBase):
+    url = "/api/attendance"
+
+    def test_teacher_marks_whole_class(self):  
+        self.client.force_login(self.teacher)
+        response = self.post_json(self.url, self.mark_payload())
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["savedCount"], 3)
+        self.assertEqual(Attendance.objects.count(), 3)
+
+    def test_all_four_statuses_are_saved(self):
+        self.client.force_login(self.teacher)
+        records = [
+            {"studentId": self.students[0].pk, "status": "Absent"},
+            {"studentId": self.students[1].pk, "status": "Late"},
+            {"studentId": self.students[2].pk, "status": "Excused", "remarks": "Doctor"},
+        ]
+        self.post_json(self.url, self.mark_payload(records))
+        saved = {a.student_id: a.status for a in Attendance.objects.all()}
+        self.assertEqual(saved[self.students[0].pk], "Absent")
+        self.assertEqual(saved[self.students[1].pk], "Late")
+        self.assertEqual(saved[self.students[2].pk], "Excused")
+        self.assertEqual(Attendance.objects.get(student=self.students[2]).remarks, "Doctor")
+
+    def test_mark_all_present_with_exceptions(self):  
+        self.client.force_login(self.teacher)
+        records = [{"studentId": self.students[1].pk, "status": "Absent"}]
+        response = self.post_json(self.url, self.mark_payload(records))
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(Attendance.objects.filter(status="Present").count(), 2)
+        self.assertEqual(Attendance.objects.get(student=self.students[1]).status, "Absent")
+
+    def test_marking_twice_returns_409(self):  
+        self.client.force_login(self.teacher)
+        self.post_json(self.url, self.mark_payload())
+        response = self.post_json(self.url, self.mark_payload())
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(Attendance.objects.count(), 3)
+
+    def test_same_class_on_different_date_is_allowed(self):
+        self.client.force_login(self.teacher)
+        self.post_json(self.url, self.mark_payload(date="2026-10-22"))
+        response = self.post_json(self.url, self.mark_payload(date="2026-10-23"))
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(Attendance.objects.count(), 6)
+
+    def test_wrong_teacher_gets_403(self):
+        self.client.force_login(self.other_teacher)
+        response = self.post_json(self.url, self.mark_payload())
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(Attendance.objects.count(), 0)
+
+    def test_admin_cannot_mark_attendance(self):
+        self.client.force_login(self.admin)
+        response = self.post_json(self.url, self.mark_payload())
+        self.assertEqual(response.status_code, 403)
+
+    def test_invalid_status_gets_400(self):
+        self.client.force_login(self.teacher)
+        records = [{"studentId": self.students[0].pk, "status": "Sick"}]
+        response = self.post_json(self.url, self.mark_payload(records))
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(Attendance.objects.count(), 0)
+
+    def test_student_from_another_class_gets_400(self):
+        other_cls = AcademicClass.objects.create(name="Grade 9", class_teacher=self.teacher)
+        other_section = Section.objects.create(academic_class=other_cls, name="B")
+        outsider = Student.objects.create(
+            name="Outsider", student_class="Grade 9", roll_number=99,
+            contact_details="x@example.com", section=other_section,
+        )
+        self.client.force_login(self.teacher)
+        records = [{"studentId": outsider.pk, "status": "Present"}]
+        response = self.post_json(self.url, self.mark_payload(records))
+        self.assertEqual(response.status_code, 400)
+
+    def test_bad_date_gets_400(self):
+        self.client.force_login(self.teacher)
+        response = self.post_json(self.url, self.mark_payload(date="23-10-2026"))
+        self.assertEqual(response.status_code, 400)
+
+    def test_missing_fields_get_400(self):
+        self.client.force_login(self.teacher)
+        response = self.post_json(self.url, {"records": []})
+        self.assertEqual(response.status_code, 400)
+
+    def test_class_with_no_students_gets_400(self):
+        empty = AcademicClass.objects.create(name="Empty", class_teacher=self.teacher)
+        self.client.force_login(self.teacher)
+        response = self.post_json(self.url, {"classId": empty.pk, "date": TODAY, "records": []})
+        self.assertEqual(response.status_code, 400)
+
+    def test_not_logged_in_gets_401(self):
+        response = self.post_json(self.url, self.mark_payload())
+        self.assertEqual(response.status_code, 401)
+
+
+class EditAttendanceApiTests(AttendanceTestBase):
+    def setUp(self):
+        super().setUp()
+        services.mark_attendance(self.teacher, self.cls.pk, TODAY, [])
+        self.record = Attendance.objects.get(student=self.students[0])
+
+    def edit_url(self):
+        return reverse("attendance:edit", args=[self.record.pk])
+
+    def test_teacher_edits_status_and_audit_log_is_created(self):  
+        self.client.force_login(self.teacher)
+        response = self.post_json(self.edit_url(), {"status": "Absent"})
+        self.assertEqual(response.status_code, 200)
+        self.record.refresh_from_db()
+        self.assertEqual(self.record.status, "Absent")
+        log = AuditLog.objects.get()
+        self.assertEqual(log.edited_by, self.teacher)
+        self.assertEqual((log.old_status, log.new_status), ("Present", "Absent"))
+
+    def test_wrong_teacher_cannot_edit(self):
+        self.client.force_login(self.other_teacher)
+        response = self.post_json(self.edit_url(), {"status": "Absent"})
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(AuditLog.objects.count(), 0)
+
+    def test_invalid_status_on_edit_gets_400(self):
+        self.client.force_login(self.teacher)
+        response = self.post_json(self.edit_url(), {"status": "Gone"})
+        self.assertEqual(response.status_code, 400)
+
+    def test_editing_missing_record_gets_404(self):
+        self.client.force_login(self.teacher)
+        response = self.post_json(reverse("attendance:edit", args=[9999]), {"status": "Absent"})
+        self.assertEqual(response.status_code, 404)
