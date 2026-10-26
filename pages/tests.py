@@ -1,5 +1,10 @@
+from datetime import timedelta
+from unittest.mock import patch
+
 from django.test import TestCase
+from django.test import override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from accounts.models import User
 
@@ -48,3 +53,43 @@ class PageAccessTests(TestCase):
         response = self.client.get(reverse("pages:mark_attendance"))
         self.assertContains(response, "Teacher")
         self.assertContains(response, "Logout")
+
+
+@override_settings(SESSION_COOKIE_AGE=15 * 60, SESSION_SAVE_EVERY_REQUEST=True)
+class SessionInactivityTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="session-teacher",
+            password="pass12345",
+            role=User.Role.TEACHER,
+        )
+        self.login_time = timezone.now()
+        with patch("django.utils.timezone.now", return_value=self.login_time):
+            self.client.force_login(self.user)
+
+    def get_protected_page_at(self, moment):
+        with patch("django.utils.timezone.now", return_value=moment):
+            return self.client.get(reverse("pages:mark_attendance"))
+
+    def test_expired_session_is_rejected(self):
+        response = self.get_protected_page_at(
+            self.login_time + timedelta(minutes=15, seconds=1)
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.url.startswith(reverse("login")))
+
+    def test_activity_just_before_timeout_resets_session_expiry(self):
+        first_activity = self.login_time + timedelta(minutes=14, seconds=59)
+        second_activity = first_activity + timedelta(minutes=14, seconds=59)
+        after_refreshed_expiry = second_activity + timedelta(minutes=15, seconds=1)
+
+        first_response = self.get_protected_page_at(first_activity)
+        self.assertEqual(first_response.status_code, 200)
+
+        second_response = self.get_protected_page_at(second_activity)
+        self.assertEqual(second_response.status_code, 200)
+
+        expired_response = self.get_protected_page_at(after_refreshed_expiry)
+        self.assertEqual(expired_response.status_code, 302)
+        self.assertTrue(expired_response.url.startswith(reverse("login")))
