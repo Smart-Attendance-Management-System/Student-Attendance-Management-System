@@ -56,6 +56,7 @@ class LoginAPITests(TestCase):
 
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.json()["status"], "error")
+        self.assertEqual(response.json()["message"], "Invalid username or password.")
         self.assertNotIn("_auth_user_id", self.client.session)
 
     def test_unknown_username_returns_401(self):
@@ -63,7 +64,19 @@ class LoginAPITests(TestCase):
 
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.json()["status"], "error")
+        self.assertEqual(response.json()["message"], "Invalid username or password.")
         self.assertNotIn("_auth_user_id", self.client.session)
+
+    def test_wrong_password_and_unknown_username_return_identical_messages(self):
+        wrong_password = self.post_login("teacher1", "wrong-password")
+        unknown_username = self.post_login("unknown-user", "pass12345")
+
+        self.assertEqual(wrong_password.status_code, 401)
+        self.assertEqual(unknown_username.status_code, 401)
+        self.assertEqual(
+            wrong_password.json()["message"],
+            unknown_username.json()["message"],
+        )
 
 
 class RolePermissionTests(TestCase):
