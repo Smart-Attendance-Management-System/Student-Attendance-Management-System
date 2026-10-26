@@ -12,6 +12,9 @@
     <a class="navbar-brand" href="{% url 'pages:home' %}">SAMS</a>
     {% if user.is_authenticated %}
     <div class="d-flex align-items-center gap-3 text-white">
+      {% if user.role == "ADMIN" %}
+      <a class="link-light" href="{% url 'accounts:list' %}">Manage Users</a>
+      {% endif %}
       <span>{{ user.get_full_name|default:user.username }} &middot; {{ user.get_role_display }}</span>
       <form method="post" action="{% url 'pages:logout' %}" class="m-0">
         {% csrf_token %}

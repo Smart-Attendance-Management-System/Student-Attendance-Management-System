@@ -48,6 +48,7 @@ subjects_urlpatterns = [
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/auth/login', account_views.login_api, name='api_login'),
+    path('accounts/', include(('accounts.urls', 'accounts'), namespace='accounts')),
     path('accounts/login/', auth_views.LoginView.as_view(), name='login'),
     path('students/', include(([
         path('', student_views.student_list, name='list'),
