@@ -66,6 +66,14 @@ $env:USE_SQLITE="1"
 python manage.py test accounts.tests.UserAccountManagementTests
 ```
 
+Role changes take effect on the user's next request, including in an existing
+login session. Verify this with:
+
+```powershell
+$env:USE_SQLITE="1"
+python manage.py test accounts.tests.UserAccountManagementTests.test_role_change_updates_permissions_for_existing_session
+```
+
 ## Student profile management
 
 Student profiles are managed under `/students/`.
