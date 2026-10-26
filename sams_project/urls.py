@@ -18,6 +18,7 @@ from django.contrib import admin
 from django.contrib.auth import views as auth_views
 from django.urls import include, path
 
+from accounts import views as account_views
 from students import views as student_views
 
 classes_urlpatterns = [
@@ -46,6 +47,7 @@ subjects_urlpatterns = [
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('api/auth/login', account_views.login_api, name='api_login'),
     path('accounts/login/', auth_views.LoginView.as_view(), name='login'),
     path('students/', include(([
         path('', student_views.student_list, name='list'),

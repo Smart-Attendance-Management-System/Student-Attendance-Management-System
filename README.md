@@ -17,6 +17,26 @@ python manage.py migrate
 python manage.py runserver
 ```
 
+## Login API
+
+`POST /api/auth/login` accepts a JSON body with `username` and `password`.
+A successful login returns the user's role and the Django session key as
+`session_token`; invalid credentials return HTTP 401.
+
+```json
+{
+  "username": "teacher1",
+  "password": "your-password"
+}
+```
+
+Run the login integration tests with:
+
+```powershell
+$env:USE_SQLITE="1"
+python manage.py test accounts.tests.LoginAPITests
+```
+
 ## Student profile management
 
 Student profiles are managed under `/students/`.
