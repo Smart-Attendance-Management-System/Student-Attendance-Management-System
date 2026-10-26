@@ -3,9 +3,15 @@ from django.shortcuts import redirect, render
 from django.utils import timezone
 
 from accounts.models import User
+from accounts.permissions import IsAdmin, IsStudentParent, IsTeacher
 from students.models import AcademicClass, Student
 
 STATUSES = ["Present", "Absent", "Late", "Excused"]
+ROLE_PERMISSIONS = {
+    User.Role.ADMIN: IsAdmin,
+    User.Role.TEACHER: IsTeacher,
+    User.Role.STUDENT_PARENT: IsStudentParent,
+}
 
 
 def role_required(*roles):
@@ -14,7 +20,10 @@ def role_required(*roles):
     def decorator(view):
         @login_required(login_url="login")
         def wrapped(request, *args, **kwargs):
-            if request.user.role not in roles:
+            if not any(
+                ROLE_PERMISSIONS[role]().has_permission(request, view)
+                for role in roles
+            ):
                 return redirect("pages:home")
             return view(request, *args, **kwargs)
 
