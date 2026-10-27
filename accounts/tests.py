@@ -2,7 +2,7 @@ import json
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
-from django.test import RequestFactory, TestCase
+from django.test import Client, RequestFactory, TestCase
 from django.urls import reverse
 
 from .forms import UserAccountForm
@@ -179,6 +179,37 @@ class UserAccountManagementTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "already exists")
         self.assertEqual(User.objects.filter(username=self.teacher.username).count(), 1)
+
+    def test_role_change_updates_permissions_for_existing_session(self):
+        teacher_client = Client()
+        teacher_client.force_login(self.teacher)
+
+        self.assertEqual(
+            teacher_client.get(reverse("accounts:list")).status_code, 403
+        )
+        self.assertEqual(
+            teacher_client.get(reverse("pages:mark_attendance")).status_code, 200
+        )
+
+        response = self.client.post(
+            reverse("accounts:update", args=[self.teacher.pk]),
+            {
+                "username": self.teacher.username,
+                "email": self.teacher.email,
+                "role": User.Role.ADMIN,
+                "password": "",
+            },
+        )
+        self.assertRedirects(response, reverse("accounts:list"))
+
+        self.teacher.refresh_from_db()
+        self.assertEqual(self.teacher.role, User.Role.ADMIN)
+        self.assertEqual(
+            teacher_client.get(reverse("accounts:list")).status_code, 200
+        )
+        self.assertEqual(
+            teacher_client.get(reverse("pages:mark_attendance")).status_code, 302
+        )
 
     def test_non_admin_cannot_manage_user_accounts(self):
         self.client.force_login(self.teacher)
