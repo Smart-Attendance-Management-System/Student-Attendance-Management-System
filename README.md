@@ -37,6 +37,18 @@ $env:USE_SQLITE="1"
 python manage.py test accounts.tests.LoginAPITests
 ```
 
+## Session inactivity timeout
+
+Authenticated sessions expire after 15 minutes without a request. Each request
+refreshes the session expiry, so active sessions remain valid.
+
+Run the session timeout tests with:
+
+```powershell
+$env:USE_SQLITE="1"
+python manage.py test pages.tests.SessionInactivityTests
+```
+
 ## Role-based access
 
 Users have one of three roles: Admin, Teacher, or Student/Parent. Reusable
