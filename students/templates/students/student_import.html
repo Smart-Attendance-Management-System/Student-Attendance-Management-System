@@ -11,6 +11,18 @@
     {% if error %}
         <p role="alert">{{ error }}</p>
     {% endif %}
+    {% if import_result %}
+        <div role="status">
+            <p>{{ import_result.imported_count }} student profiles imported successfully.</p>
+            <p>{{ import_result.failed_count }} rows failed and were skipped.</p>
+            <p>Failed rows refer to physical file rows, including the header as row 1.</p>
+            <ul>
+                {% for failure in import_result.failures %}
+                    <li>Row {{ failure.row_number }}: {{ failure.reason }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
     <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
         <label for="file">Student file:</label>

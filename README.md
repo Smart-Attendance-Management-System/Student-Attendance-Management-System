@@ -94,7 +94,10 @@ Admins can bulk import students from `/students/import/`.
 Imports accept UTF-8 `.csv` and `.xlsx` files up to 5 MB.
 Required columns are `name`, `class`, `roll_number`, and `contact_details`;
 `section` is optional and must belong to the specified class.
-Imports are all-or-nothing: if any row is invalid, no students are saved.
+Each data row is validated independently. Invalid rows are skipped and reported
+with their physical file row number (the header is row 1), while valid rows
+from the same file are saved. Structural file errors, such as missing required
+columns or malformed Excel files, reject the upload.
 
 ## Academic structure management
 

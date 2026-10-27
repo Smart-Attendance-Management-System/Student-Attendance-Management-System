@@ -111,7 +111,7 @@ def student_bulk_import(request):
                 {"error": "Select a CSV or .xlsx file to upload."},
             )
         try:
-            imported_count = import_students(uploaded_file)
+            import_result = import_students(uploaded_file)
         except BulkImportError as exc:
             return render(
                 request,
@@ -119,7 +119,16 @@ def student_bulk_import(request):
                 {"error": str(exc)},
                 status=400,
             )
-        messages.success(request, f"{imported_count} student profiles imported successfully.")
+        if import_result["failures"]:
+            return render(
+                request,
+                "students/student_import.html",
+                {"import_result": import_result},
+            )
+        messages.success(
+            request,
+            f"{import_result['imported_count']} student profiles imported successfully.",
+        )
         return redirect("students:list")
     return render(request, "students/student_import.html")
 
