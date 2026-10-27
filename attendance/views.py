@@ -3,6 +3,10 @@ import json
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_POST
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.response import Response
+
+from accounts.permissions import IsAdmin, IsTeacher
 
 from . import services
 from .models import Attendance
@@ -65,3 +69,17 @@ def edit_attendance_api(request, pk):
             "timestamp": attendance.updated_at.isoformat(),
         }
     )
+
+@api_view(["GET"])
+@permission_classes([IsAdmin | IsTeacher])
+def daily_attendance_api(request):
+    """GET /api/attendance/daily?classId=1&date=2026-10-23  (REQ4.1)"""
+    try:
+        data = services.get_daily_attendance(
+            request.user,
+            request.query_params.get("classId"),
+            request.query_params.get("date"),
+        )
+    except services.AttendanceError as err:
+        return Response({"status": "error", "message": err.message}, status=err.status_code)
+    return Response({"status": "success", **data})

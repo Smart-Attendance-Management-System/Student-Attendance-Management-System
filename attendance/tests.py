@@ -227,3 +227,82 @@ class EditAttendanceApiTests(AttendanceTestBase):
         self.client.force_login(self.teacher)
         response = self.post_json(reverse("attendance:edit", args=[9999]), {"status": "Absent"})
         self.assertEqual(response.status_code, 404)
+
+class DailyAttendanceApiTests(AttendanceTestBase):
+    """REQ4.1: daily attendance view for a class and date."""
+
+    url = "/api/attendance/daily"
+
+    def mark_with_exceptions(self, date=TODAY):
+        records = [
+            {"studentId": self.students[1].pk, "status": "Absent"},
+            {"studentId": self.students[2].pk, "status": "Late", "remarks": "Bus"},
+        ]
+        services.mark_attendance(self.teacher, self.cls.pk, date, records)
+
+    def get_daily(self, class_id=None, date=TODAY):
+        params = {"classId": self.cls.pk if class_id is None else class_id, "date": date}
+        return self.client.get(self.url, params)
+
+    def test_teacher_sees_every_student_status_for_a_marked_day(self):
+        self.mark_with_exceptions()
+        self.client.force_login(self.teacher)
+        response = self.get_daily()
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertTrue(body["marked"])
+        self.assertEqual(body["className"], "Grade 10")
+        self.assertEqual(
+            [(r["rollNumber"], r["status"]) for r in body["records"]],
+            [(1, "Present"), (2, "Absent"), (3, "Late")],
+        )
+        self.assertEqual(body["records"][2]["remarks"], "Bus")
+        self.assertEqual(
+            body["counts"], {"Present": 1, "Absent": 1, "Late": 1, "Excused": 0}
+        )
+
+    def test_day_with_no_attendance_returns_clear_message(self):
+        self.client.force_login(self.teacher)
+        response = self.get_daily()
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertFalse(body["marked"])
+        self.assertEqual(body["records"], [])
+        self.assertIn("not been marked", body["message"])
+
+    def test_only_the_requested_date_is_returned(self):
+        self.mark_with_exceptions(date="2026-10-22")
+        self.client.force_login(self.teacher)
+        body = self.get_daily(date=TODAY).json()
+        self.assertFalse(body["marked"])
+        self.assertTrue(self.get_daily(date="2026-10-22").json()["marked"])
+
+    def test_admin_can_view_any_class(self):
+        self.mark_with_exceptions()
+        self.client.force_login(self.admin)
+        response = self.get_daily()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()["records"]), 3)
+
+    def test_other_teacher_gets_403(self):
+        self.mark_with_exceptions()
+        self.client.force_login(self.other_teacher)
+        self.assertEqual(self.get_daily().status_code, 403)
+
+    def test_student_parent_gets_403(self):
+        parent = User.objects.create_user(
+            username="parent1", password="pass12345", role=User.Role.STUDENT_PARENT
+        )
+        self.client.force_login(parent)
+        self.assertEqual(self.get_daily().status_code, 403)
+
+    def test_not_logged_in_is_refused(self):
+        self.assertIn(self.get_daily().status_code, (401, 403))
+
+    def test_bad_input_gets_400_or_404(self):
+        self.client.force_login(self.teacher)
+        self.assertEqual(self.get_daily(date="23-10-2026").status_code, 400)
+        self.assertEqual(self.client.get(self.url, {"date": TODAY}).status_code, 400)
+        self.assertEqual(self.client.get(self.url, {"classId": self.cls.pk}).status_code, 400)
+        self.assertEqual(self.get_daily(class_id="abc").status_code, 400)
+        self.assertEqual(self.get_daily(class_id=9999).status_code, 404)
