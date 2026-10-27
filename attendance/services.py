@@ -121,3 +121,52 @@ def edit_attendance(user, attendance, new_status, remarks=None):
         attendance_date=attendance.date,
     )
     return attendance
+
+def get_daily_attendance(user, class_id, date_value):
+    """REQ4.1: every student's status for one class on one date.
+
+    Admins can view any class. A teacher can only view a class they are
+    assigned to. If nothing was marked that day, `marked` is False and a
+    clear message is returned instead of an error.
+    """
+    try:
+        class_id = int(class_id)
+    except (TypeError, ValueError):
+        raise AttendanceError("classId is required and must be a number.", 400)
+
+    academic_class = AcademicClass.objects.filter(pk=class_id).first()
+    if academic_class is None:
+        raise AttendanceError("Class not found.", 404)
+    if user.role == User.Role.TEACHER and not is_class_teacher(user, academic_class):
+        raise AttendanceError("You are not assigned to this class.", 403)
+
+    date = parse_date(date_value)
+    records = list(
+        Attendance.objects.filter(academic_class=academic_class, date=date)
+        .select_related("student")
+        .order_by("student__roll_number")
+    )
+
+    counts = {status: 0 for status in VALID_STATUSES}
+    for record in records:
+        counts[record.status] += 1
+
+    return {
+        "classId": academic_class.pk,
+        "className": str(academic_class),
+        "date": date.isoformat(),
+        "marked": bool(records),
+        "message": "" if records else "Attendance has not been marked for this class on this date.",
+        "counts": counts,
+        "records": [
+            {
+                "attendanceId": r.pk,
+                "studentId": r.student_id,
+                "rollNumber": r.student.roll_number,
+                "name": r.student.name,
+                "status": r.status,
+                "remarks": r.remarks,
+            }
+            for r in records
+        ],
+    }
