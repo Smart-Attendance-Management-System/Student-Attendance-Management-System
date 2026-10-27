@@ -7,6 +7,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods
 
 from accounts.models import User
+from accounts.permissions import IsAdmin
 from .bulk_import import BulkImportError, import_students
 from .forms import AcademicClassForm, SectionForm, StudentForm, SubjectForm
 from .models import AcademicClass, Section, Student, Subject
@@ -16,7 +17,7 @@ def _admin_required(view_func):
     def wrapped(request, *args, **kwargs):
         if not request.user.is_authenticated:
             return redirect("login")
-        if request.user.role != User.Role.ADMIN:
+        if not IsAdmin().has_permission(request, view_func):
             return HttpResponseForbidden("Only admins can manage these records.")
         return view_func(request, *args, **kwargs)
 

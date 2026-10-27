@@ -37,6 +37,21 @@ $env:USE_SQLITE="1"
 python manage.py test accounts.tests.LoginAPITests
 ```
 
+## Role-based access
+
+Users have one of three roles: Admin, Teacher, or Student/Parent. Reusable
+Django REST Framework permission classes are available from
+`accounts.permissions`: `IsAdmin`, `IsTeacher`, and `IsStudentParent`.
+Admin-only student and academic-structure management and role-specific pages
+enforce these role checks.
+
+Run the permission and Admin-endpoint access tests with:
+
+```powershell
+$env:USE_SQLITE="1"
+python manage.py test accounts.tests.RolePermissionTests students.tests.StudentProfileTests.test_teacher_receives_403_from_admin_only_endpoint
+```
+
 ## Student profile management
 
 Student profiles are managed under `/students/`.

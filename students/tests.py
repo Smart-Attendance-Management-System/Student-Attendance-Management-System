@@ -121,6 +121,21 @@ class StudentProfileTests(TestCase):
         delete_response = self.client.post(reverse("students:delete", args=[self.student.pk]))
         self.assertEqual(delete_response.status_code, 403)
 
+    def test_teacher_receives_403_from_admin_only_endpoint(self):
+        self.client.force_login(self.teacher)
+
+        response = self.client.post(
+            reverse("students:create"),
+            {
+                "name": "Denied User",
+                "student_class": "Grade 10",
+                "roll_number": 99,
+                "contact_details": "denied@example.com",
+            },
+        )
+
+        self.assertEqual(response.status_code, 403)
+
     def test_unauthenticated_access_is_handled_according_to_rules(self):
         response = self.client.get(reverse("students:list"))
         self.assertEqual(response.status_code, 302)
