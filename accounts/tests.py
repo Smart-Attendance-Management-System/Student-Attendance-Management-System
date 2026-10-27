@@ -5,6 +5,7 @@ from django.contrib.auth.models import AnonymousUser
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
 
+from .forms import UserAccountForm
 from .permissions import IsAdmin, IsStudentParent, IsTeacher
 
 User = get_user_model()
@@ -107,3 +108,101 @@ class RolePermissionTests(TestCase):
 
         for permission in (IsAdmin(), IsTeacher(), IsStudentParent()):
             self.assertFalse(permission.has_permission(self.request, None))
+
+
+class UserAccountManagementTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            username="account-admin",
+            password="pass12345",
+            role=User.Role.ADMIN,
+        )
+        self.teacher = User.objects.create_user(
+            username="account-teacher",
+            password="pass12345",
+            role=User.Role.TEACHER,
+        )
+        self.client.force_login(self.admin)
+
+    def test_admin_can_create_edit_and_delete_user(self):
+        list_response = self.client.get(reverse("accounts:list"))
+        self.assertEqual(list_response.status_code, 200)
+        self.assertContains(list_response, "User Accounts")
+
+        create_response = self.client.post(
+            reverse("accounts:create"),
+            {
+                "username": "new-teacher",
+                "email": "new-teacher@example.com",
+                "role": User.Role.TEACHER,
+                "password": "N3w!Account-Password-2026",
+            },
+        )
+        self.assertRedirects(create_response, reverse("accounts:list"))
+        account = User.objects.get(username="new-teacher")
+        self.assertEqual(account.email, "new-teacher@example.com")
+        self.assertEqual(account.role, User.Role.TEACHER)
+        self.assertTrue(account.check_password("N3w!Account-Password-2026"))
+
+        edit_response = self.client.post(
+            reverse("accounts:update", args=[account.pk]),
+            {
+                "username": "new-teacher",
+                "email": "updated@example.com",
+                "role": User.Role.STUDENT_PARENT,
+                "password": "",
+            },
+        )
+        self.assertRedirects(edit_response, reverse("accounts:list"))
+        account.refresh_from_db()
+        self.assertEqual(account.email, "updated@example.com")
+        self.assertEqual(account.role, User.Role.STUDENT_PARENT)
+        self.assertTrue(account.check_password("N3w!Account-Password-2026"))
+
+        delete_response = self.client.post(
+            reverse("accounts:delete", args=[account.pk])
+        )
+        self.assertRedirects(delete_response, reverse("accounts:list"))
+        self.assertFalse(User.objects.filter(pk=account.pk).exists())
+
+    def test_duplicate_username_is_rejected(self):
+        response = self.client.post(
+            reverse("accounts:create"),
+            {
+                "username": self.teacher.username,
+                "email": "duplicate@example.com",
+                "role": User.Role.TEACHER,
+                "password": "N3w!Account-Password-2026",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "already exists")
+        self.assertEqual(User.objects.filter(username=self.teacher.username).count(), 1)
+
+    def test_non_admin_cannot_manage_user_accounts(self):
+        self.client.force_login(self.teacher)
+        requests = (
+            ("get", reverse("accounts:list")),
+            ("get", reverse("accounts:create")),
+            ("post", reverse("accounts:update", args=[self.admin.pk])),
+            ("post", reverse("accounts:delete", args=[self.admin.pk])),
+        )
+
+        for method, path in requests:
+            with self.subTest(method=method, path=path):
+                response = getattr(self.client, method)(path)
+                self.assertEqual(response.status_code, 403)
+
+    def test_account_form_requires_password_when_creating_user(self):
+        form = UserAccountForm(
+            data={
+                "username": "no-password",
+                "email": "",
+                "role": User.Role.TEACHER,
+                "password": "",
+            }
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("password", form.errors)

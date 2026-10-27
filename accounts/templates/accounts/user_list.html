@@ -1,0 +1,40 @@
+{% extends "pages/base.html" %}
+
+{% block title %}Manage Users | SAMS{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1>User Accounts</h1>
+  <a class="btn btn-primary" href="{% url 'accounts:create' %}">Create User</a>
+</div>
+<div class="table-responsive">
+  <table class="table table-striped align-middle">
+    <thead>
+      <tr>
+        <th>Username</th>
+        <th>Email</th>
+        <th>Role</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for account in users %}
+      <tr>
+        <td>{{ account.username }}</td>
+        <td>{{ account.email|default:"—" }}</td>
+        <td>{{ account.get_role_display }}</td>
+        <td>
+          <a class="btn btn-sm btn-outline-primary" href="{% url 'accounts:update' account.pk %}">Edit</a>
+          <form method="post" action="{% url 'accounts:delete' account.pk %}" class="d-inline">
+            {% csrf_token %}
+            <button class="btn btn-sm btn-outline-danger" type="submit" onclick="return confirm('Delete this user account?')">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="4">No user accounts found.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

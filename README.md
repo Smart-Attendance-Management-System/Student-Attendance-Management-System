@@ -52,6 +52,20 @@ $env:USE_SQLITE="1"
 python manage.py test accounts.tests.RolePermissionTests students.tests.StudentProfileTests.test_teacher_receives_403_from_admin_only_endpoint
 ```
 
+## User account management
+
+Admins can manage accounts at `/accounts/users/`: create accounts with a
+username, email, role, and password; edit account details or role; and delete
+accounts. Passwords are validated using the configured Django password
+validators. Non-admin users receive HTTP 403.
+
+Run the TC-02 account management tests with:
+
+```powershell
+$env:USE_SQLITE="1"
+python manage.py test accounts.tests.UserAccountManagementTests
+```
+
 ## Student profile management
 
 Student profiles are managed under `/students/`.
