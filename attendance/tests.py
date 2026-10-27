@@ -1,8 +1,10 @@
 import datetime
 import json
+import time
 
-from django.db import IntegrityError
+from django.db import IntegrityError, connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from accounts.models import User
@@ -306,3 +308,62 @@ class DailyAttendanceApiTests(AttendanceTestBase):
         self.assertEqual(self.client.get(self.url, {"classId": self.cls.pk}).status_code, 400)
         self.assertEqual(self.get_daily(class_id="abc").status_code, 400)
         self.assertEqual(self.get_daily(class_id=9999).status_code, 404)
+
+class FiftyStudentSubmissionTests(AttendanceTestBase):
+    """REQ3.5: a full class of 50 students is saved in one request, in under 5 seconds."""
+
+    url = "/api/attendance"
+    time_limit_seconds = 5
+
+    def make_class(self, name, size, first_roll):
+        academic_class = AcademicClass.objects.create(name=name, class_teacher=self.teacher)
+        section = Section.objects.create(academic_class=academic_class, name="A")
+        Student.objects.bulk_create(
+            [
+                Student(
+                    name=f"{name} student {n}",
+                    student_class=name,
+                    roll_number=first_roll + n,
+                    contact_details=f"parent{first_roll + n}@example.com",
+                    section=section,
+                )
+                for n in range(size)
+            ]
+        )
+        return academic_class
+
+    def submit(self, academic_class, records):
+        payload = {"classId": academic_class.pk, "date": TODAY, "records": records}
+        return self.client.post(self.url, json.dumps(payload), content_type="application/json")
+
+    def test_class_of_50_is_saved_in_one_request_under_5_seconds(self):
+        academic_class = self.make_class("Grade 11", 50, first_roll=1000)
+        students = list(Student.objects.filter(section__academic_class=academic_class))
+        # A realistic mix: every 5th student is Absent, every 7th is Late
+        records = []
+        for index, student in enumerate(students, start=1):
+            status = "Absent" if index % 5 == 0 else "Late" if index % 7 == 0 else "Present"
+            records.append({"studentId": student.pk, "status": status})
+        self.client.force_login(self.teacher)
+
+        started = time.perf_counter()
+        response = self.submit(academic_class, records)
+        elapsed = time.perf_counter() - started
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()["savedCount"], 50)
+        self.assertEqual(Attendance.objects.filter(academic_class=academic_class).count(), 50)
+        self.assertLess(elapsed, self.time_limit_seconds, f"Took {elapsed:.2f}s")
+
+    def test_number_of_queries_does_not_grow_with_class_size(self):
+        small = self.make_class("Small", 5, first_roll=100)
+        large = self.make_class("Large", 50, first_roll=200)
+        self.client.force_login(self.teacher)
+
+        with CaptureQueriesContext(connection) as small_queries:
+            self.assertEqual(self.submit(small, []).status_code, 201)
+        with CaptureQueriesContext(connection) as large_queries:
+            self.assertEqual(self.submit(large, []).status_code, 201)
+
+        # 50 students must cost no more queries than 5 (no one-query-per-student).
+        self.assertEqual(len(small_queries), len(large_queries))
