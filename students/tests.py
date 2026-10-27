@@ -477,6 +477,40 @@ class BulkStudentImportTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(Student.objects.count(), 0)
 
+    def test_header_only_file_is_rejected_without_writes(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse("students:import"),
+            {
+                "file": SimpleUploadedFile(
+                    "header-only.csv",
+                    b"name,class,roll_number,contact_details\n",
+                    content_type="text/csv",
+                )
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(response, "does not contain any student records", status_code=400)
+        self.assertEqual(Student.objects.count(), 0)
+
+    def test_malformed_excel_file_is_rejected_without_writes(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse("students:import"),
+            {
+                "file": SimpleUploadedFile(
+                    "malformed.xlsx",
+                    b"not an Excel workbook",
+                    content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(response, "Excel file could not be read", status_code=400)
+        self.assertEqual(Student.objects.count(), 0)
+
     def test_unsupported_file_type_is_rejected(self):
         self.client.force_login(self.admin)
         response = self.client.post(
@@ -526,10 +560,12 @@ class BulkStudentImportTests(TestCase):
                 )
             },
         )
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Row 2")
+        self.assertContains(response, "roll number must be a positive whole number")
         self.assertEqual(Student.objects.count(), 0)
 
-    def test_duplicate_roll_numbers_are_rejected_atomically(self):
+    def test_duplicate_roll_numbers_are_skipped_and_reported(self):
         existing = Student.objects.create(
             name="Existing Student",
             student_class="Grade 10",
@@ -562,9 +598,78 @@ class BulkStudentImportTests(TestCase):
             },
         )
 
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(Student.objects.count(), 1)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Row 3")
+        self.assertContains(response, "duplicated in the file")
+        self.assertEqual(Student.objects.count(), 2)
         self.assertTrue(Student.objects.filter(pk=existing.pk).exists())
+        self.assertTrue(Student.objects.filter(roll_number=105).exists())
+
+    def test_missing_required_row_is_skipped_while_valid_rows_are_saved(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse("students:import"),
+            {
+                "file": self.csv_file(
+                    [
+                        {
+                            "name": "Missing Contact",
+                            "class": "Grade 10",
+                            "section": "A",
+                            "roll_number": "108",
+                            "contact_details": " ",
+                        },
+                        {
+                            "name": "Valid Student",
+                            "class": "Grade 10",
+                            "section": "A",
+                            "roll_number": "109",
+                            "contact_details": "valid@example.com",
+                        },
+                    ],
+                    name="partial.csv",
+                )
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Row 2")
+        self.assertContains(response, "contact details is required")
+        self.assertEqual(Student.objects.count(), 1)
+        self.assertTrue(Student.objects.filter(roll_number=109).exists())
+
+    def test_multiple_invalid_rows_report_physical_file_rows(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse("students:import"),
+            {
+                "file": self.csv_file(
+                    [
+                        {
+                            "name": "",
+                            "class": "Grade 10",
+                            "section": "A",
+                            "roll_number": "110",
+                            "contact_details": "missing-name@example.com",
+                        },
+                        {
+                            "name": "Bad Roll",
+                            "class": "Grade 10",
+                            "section": "A",
+                            "roll_number": "not-a-number",
+                            "contact_details": "bad-roll@example.com",
+                        },
+                    ],
+                    name="multiple-invalid.csv",
+                )
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Row 2")
+        self.assertContains(response, "Row 3")
+        self.assertContains(response, "name is required")
+        self.assertContains(response, "roll number must be a positive whole number")
 
     def test_unknown_class_or_section_is_rejected_without_writes(self):
         self.client.force_login(self.admin)
@@ -586,8 +691,8 @@ class BulkStudentImportTests(TestCase):
             },
         )
 
-        self.assertEqual(response.status_code, 400)
-        self.assertContains(response, "was not found", status_code=400)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "was not found")
         self.assertEqual(Student.objects.count(), 0)
 
     def test_non_admin_and_unauthenticated_users_cannot_import(self):
