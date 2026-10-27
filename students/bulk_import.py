@@ -137,49 +137,83 @@ def import_students(uploaded_file):
     rows = _map_rows(_read_rows(uploaded_file))
     seen_roll_numbers = set()
     forms = []
+    failures = []
 
     for data in rows:
         row_number = data.pop("row_number")
         for field, label in (
             ("name", "name"),
             ("class", "class"),
+            ("roll_number", "roll number"),
             ("contact_details", "contact details"),
         ):
             if not data.get(field):
-                raise BulkImportError(f"Row {row_number}: {label} is required.")
-        try:
-            roll_number = int(data["roll_number"])
-        except (TypeError, ValueError) as exc:
-            raise BulkImportError(
-                f"Row {row_number}: roll number must be a positive whole number."
-            ) from exc
-        if roll_number in seen_roll_numbers:
-            raise BulkImportError(
-                f"Row {row_number}: roll number {roll_number} is duplicated in the file."
-            )
-        seen_roll_numbers.add(roll_number)
-        if Student.objects.filter(roll_number=roll_number).exists():
-            raise BulkImportError(
-                f"Row {row_number}: roll number {roll_number} already exists."
-            )
+                failures.append(
+                    {"row_number": row_number, "reason": f"{label} is required."}
+                )
+                break
+        else:
+            try:
+                roll_number = int(data["roll_number"])
+            except (TypeError, ValueError):
+                failures.append(
+                    {
+                        "row_number": row_number,
+                        "reason": "roll number must be a positive whole number.",
+                    }
+                )
+                continue
+            if roll_number <= 0:
+                failures.append(
+                    {
+                        "row_number": row_number,
+                        "reason": "roll number must be a positive whole number.",
+                    }
+                )
+                continue
+            if roll_number in seen_roll_numbers:
+                failures.append(
+                    {
+                        "row_number": row_number,
+                        "reason": f"roll number {roll_number} is duplicated in the file.",
+                    }
+                )
+                continue
+            seen_roll_numbers.add(roll_number)
+            if Student.objects.filter(roll_number=roll_number).exists():
+                failures.append(
+                    {
+                        "row_number": row_number,
+                        "reason": f"roll number {roll_number} already exists.",
+                    }
+                )
+                continue
 
-        academic_class, section = _resolve_section(data, row_number)
-        form = StudentForm(
-            {
-                "name": data.get("name", ""),
-                "student_class": str(academic_class),
-                "section": section.pk if section else "",
-                "roll_number": roll_number,
-                "contact_details": data.get("contact_details", ""),
-            }
-        )
-        if not form.is_valid():
-            errors = "; ".join(
-                f"{field}: {', '.join(messages)}"
-                for field, messages in form.errors.items()
+            try:
+                academic_class, section = _resolve_section(data, row_number)
+            except BulkImportError as exc:
+                failures.append(
+                    {"row_number": row_number, "reason": str(exc).split(": ", 1)[-1]}
+                )
+                continue
+
+            form = StudentForm(
+                {
+                    "name": data.get("name", ""),
+                    "student_class": str(academic_class),
+                    "section": section.pk if section else "",
+                    "roll_number": roll_number,
+                    "contact_details": data.get("contact_details", ""),
+                }
             )
-            raise BulkImportError(f"Row {row_number}: {errors}")
-        forms.append(form)
+            if not form.is_valid():
+                errors = "; ".join(
+                    f"{field}: {', '.join(messages)}"
+                    for field, messages in form.errors.items()
+                )
+                failures.append({"row_number": row_number, "reason": errors})
+                continue
+            forms.append(form)
 
     try:
         with transaction.atomic():
@@ -191,4 +225,8 @@ def import_students(uploaded_file):
         raise BulkImportError(
             "The import could not be completed because one or more records are invalid."
         ) from exc
-    return len(forms)
+    return {
+        "imported_count": len(forms),
+        "failed_count": len(failures),
+        "failures": failures,
+    }
