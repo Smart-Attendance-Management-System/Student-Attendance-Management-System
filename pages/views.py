@@ -69,3 +69,16 @@ def mark_attendance(request):
             "today": timezone.localdate(),
         },
     )
+
+@role_required(User.Role.ADMIN, User.Role.TEACHER)
+def daily_attendance(request):
+    """REQ4.1 screen: a teacher sees their own classes, an admin sees all."""
+    if request.user.role == User.Role.TEACHER:
+        classes = AcademicClass.objects.filter(class_teacher=request.user)
+    else:
+        classes = AcademicClass.objects.all()
+    return render(
+        request,
+        "pages/daily_attendance.html",
+        {"classes": classes, "today": timezone.localdate()},
+    )
