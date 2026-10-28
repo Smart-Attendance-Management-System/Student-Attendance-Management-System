@@ -1,0 +1,121 @@
+{% extends "pages/base.html" %}
+{% block title %}Daily attendance - SAMS{% endblock %}
+{% block content %}
+<h1 class="h3 mb-3">Daily attendance</h1>
+
+<div class="row g-2 mb-4 align-items-end">
+  <div class="col-12 col-md-4">
+    <label for="classSelect" class="form-label">Class</label>
+    <select id="classSelect" class="form-select">
+      <option value="">Select a class</option>
+      {% for c in classes %}
+        <option value="{{ c.pk }}" {% if classes|length == 1 %}selected{% endif %}>{{ c }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-12 col-md-3">
+    <label for="dateInput" class="form-label">Date</label>
+    <input type="date" id="dateInput" class="form-control" value="{{ today|date:'Y-m-d' }}">
+  </div>
+  <div class="col-12 col-md-auto">
+    <button type="button" id="viewBtn" class="btn btn-primary">View attendance</button>
+  </div>
+</div>
+
+<div id="result"></div>
+
+<script>
+  const BADGE = { Present: "success", Absent: "danger", Late: "warning", Excused: "info" };
+  const result = document.getElementById("result");
+
+  function alertBox(kind, text) {
+    const div = document.createElement("div");
+    div.className = "alert alert-" + kind;
+    div.textContent = text;
+    return div;
+  }
+
+  function showAlert(kind, text) {
+    result.replaceChildren(alertBox(kind, text));
+  }
+
+  function addCell(row, text) {
+    const td = document.createElement("td");
+    td.textContent = text;
+    row.appendChild(td);
+    return td;
+  }
+
+  function render(data) {
+    result.replaceChildren();
+
+    const heading = document.createElement("h2");
+    heading.className = "h5 mb-3";
+    heading.textContent = data.className + " on " + data.date;
+    result.appendChild(heading);
+
+    if (!data.marked) {
+      result.appendChild(alertBox("secondary", data.message));
+      return;
+    }
+
+    const counts = document.createElement("div");
+    counts.className = "mb-3 d-flex flex-wrap gap-2";
+    Object.keys(BADGE).forEach(status => {
+      const badge = document.createElement("span");
+      badge.className = "badge text-bg-" + BADGE[status];
+      badge.textContent = status + ": " + data.counts[status];
+      counts.appendChild(badge);
+    });
+    result.appendChild(counts);
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "table-responsive";
+    const table = document.createElement("table");
+    table.className = "table bg-white align-middle";
+    const head = table.createTHead().insertRow();
+    ["Roll no.", "Name", "Status", "Remarks"].forEach(label => {
+      const th = document.createElement("th");
+      th.textContent = label;
+      head.appendChild(th);
+    });
+    const body = table.createTBody();
+    data.records.forEach(record => {
+      const row = body.insertRow();
+      addCell(row, record.rollNumber);
+      addCell(row, record.name);
+      const statusCell = addCell(row, "");
+      const badge = document.createElement("span");
+      badge.className = "badge text-bg-" + (BADGE[record.status] || "secondary");
+      badge.textContent = record.status;
+      statusCell.appendChild(badge);
+      addCell(row, record.remarks || "");
+    });
+    wrapper.appendChild(table);
+    result.appendChild(wrapper);
+  }
+
+  document.getElementById("viewBtn").addEventListener("click", async () => {
+    const classId = document.getElementById("classSelect").value;
+    const date = document.getElementById("dateInput").value;
+    if (!classId) { showAlert("warning", "Please select a class."); return; }
+    if (!date) { showAlert("warning", "Please choose a date."); return; }
+
+    const url = "/api/attendance/daily?classId=" + encodeURIComponent(classId) +
+                "&date=" + encodeURIComponent(date);
+    try {
+      const response = await fetch(url, { headers: { "Accept": "application/json" } });
+      const data = await response.json().catch(() => ({}));
+      if (response.ok) {
+        render(data);
+      } else if (response.status === 403) {
+        showAlert("danger", "You are not allowed to view this class.");
+      } else {
+        showAlert("danger", data.message || "Could not load attendance (error " + response.status + ").");
+      }
+    } catch (err) {
+      showAlert("danger", "Could not reach the server.");
+    }
+  });
+</script>
+{% endblock %}
