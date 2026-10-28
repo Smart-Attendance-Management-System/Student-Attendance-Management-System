@@ -2,6 +2,7 @@ import datetime
 import json
 import time
 
+from unittest.mock import patch
 from django.db import IntegrityError, connection
 from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
@@ -367,3 +368,46 @@ class FiftyStudentSubmissionTests(AttendanceTestBase):
 
         # 50 students must cost no more queries than 5 (no one-query-per-student).
         self.assertEqual(len(small_queries), len(large_queries))
+
+class ReliabilityTests(AttendanceTestBase):
+    """NFR3: no conflicting entries, and the system can be checked for uptime."""
+
+    url = "/api/attendance"
+
+    def test_two_submissions_at_the_same_moment_save_only_one_set(self):
+        self.client.force_login(self.teacher)
+        first_records = [{"studentId": self.students[0].pk, "status": "Absent"}]
+
+        # Simulate the race: both requests pass the "already marked?" check,
+        # so only the database unique constraint can stop the second one.
+        with patch("attendance.services.attendance_exists", return_value=False):
+            first = self.post_json(self.url, self.mark_payload(first_records))
+            second = self.post_json(self.url, self.mark_payload())
+
+        self.assertEqual(first.status_code, 201)
+        self.assertEqual(second.status_code, 409)
+        self.assertEqual(
+            Attendance.objects.filter(academic_class=self.cls, date=TODAY).count(),
+            len(self.students),
+        )
+        # The first submission is untouched by the rejected second one
+        self.assertEqual(Attendance.objects.get(student=self.students[0]).status, "Absent")
+
+    def test_rejected_duplicate_leaves_no_partial_data(self):
+        self.client.force_login(self.teacher)
+        self.post_json(self.url, self.mark_payload())
+        before = list(Attendance.objects.order_by("pk").values_list("pk", "status"))
+        self.post_json(self.url, self.mark_payload([{"studentId": self.students[1].pk, "status": "Late"}]))
+        after = list(Attendance.objects.order_by("pk").values_list("pk", "status"))
+        self.assertEqual(before, after)
+
+    def test_health_check_reports_ok_without_login(self):
+        response = self.client.get("/health/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"status": "ok", "database": "up"})
+
+    def test_health_check_reports_503_when_database_is_down(self):
+        with patch("attendance.views.connection.cursor", side_effect=Exception("db down")):
+            response = self.client.get("/health/")
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["status"], "error")
