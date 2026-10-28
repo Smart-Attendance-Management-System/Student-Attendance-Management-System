@@ -1,8 +1,9 @@
 import json
 
+from django.db import connection
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
@@ -83,3 +84,13 @@ def daily_attendance_api(request):
     except services.AttendanceError as err:
         return Response({"status": "error", "message": err.message}, status=err.status_code)
     return Response({"status": "success", **data})
+
+@require_GET
+def health_check(request):
+    """GET /health/  (NFR3) Simple uptime check an uptime monitor can ping."""
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+    except Exception:
+        return JsonResponse({"status": "error", "database": "down"}, status=503)
+    return JsonResponse({"status": "ok", "database": "up"})
