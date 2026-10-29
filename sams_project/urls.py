@@ -45,6 +45,8 @@ subjects_urlpatterns = [
     path('<int:pk>/delete/', student_views.subject_delete, name='delete'),
 ]
 
+# The "View site" link in the admin header opens the sign-in page
+admin.site.site_url = "/accounts/login/"
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/auth/login', account_views.login_api, name='api_login'),

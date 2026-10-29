@@ -84,6 +84,12 @@ if os.environ.get("USE_SQLITE") == "1":
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
             "NAME": BASE_DIR / "db.sqlite3",
+            "OPTIONS": {
+                # NFR1: with many users at once, wait for the write lock
+                # instead of failing with "database is locked"
+                "transaction_mode": "IMMEDIATE",
+                "timeout": 30,
+            },
         }
     }
 else:
