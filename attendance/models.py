@@ -42,6 +42,10 @@ class Attendance(models.Model):
                 name="unique_attendance_per_student_class_date",
             ),
         ]
+        indexes = [
+            # NFR1: speeds up "who was marked in this class on this date" reports
+            models.Index(fields=["academic_class", "date"], name="attendance_class_date_idx"),
+        ]
 
     def __str__(self):
         return f"{self.student} - {self.date} - {self.status}"

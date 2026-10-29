@@ -411,3 +411,70 @@ class ReliabilityTests(AttendanceTestBase):
             response = self.client.get("/health/")
         self.assertEqual(response.status_code, 503)
         self.assertEqual(response.json()["status"], "error")
+
+class ScaleAndIndexTests(AttendanceTestBase):
+    """NFR1: the Attendance table is indexed and reports stay fast with 1000+ students."""
+
+    def index_column_sets(self):
+        with connection.cursor() as cursor:
+            constraints = connection.introspection.get_constraints(
+                cursor, Attendance._meta.db_table
+            )
+        return [
+            tuple(info["columns"])
+            for info in constraints.values()
+            if info["index"] or info["unique"]
+        ]
+
+    def test_attendance_table_is_indexed_on_student_class_and_date(self):
+        indexed = self.index_column_sets()
+        # One index covering student + class + date (the REQ3.4 unique rule) ...
+        self.assertIn(("student_id", "academic_class_id", "date"), indexed)
+        # ... and one for "who was marked in this class on this date" reports
+        self.assertIn(("academic_class_id", "date"), indexed)
+
+    def test_daily_view_stays_fast_with_1000_students_of_data(self):
+        # 20 classes x 50 students = 1000 students, each with 3 days of attendance
+        admin_classes = []
+        roll = 5000
+        for number in range(20):
+            academic_class = AcademicClass.objects.create(
+                name=f"Scale {number}", class_teacher=self.teacher
+            )
+            section = Section.objects.create(academic_class=academic_class, name="A")
+            Student.objects.bulk_create(
+                [
+                    Student(
+                        name=f"Scale student {number}-{n}",
+                        student_class=academic_class.name,
+                        roll_number=roll + n,
+                        contact_details=f"scale{number}-{n}@example.com",
+                        section=section,
+                    )
+                    for n in range(50)
+                ]
+            )
+            roll += 100
+            admin_classes.append(academic_class)
+
+        rows = [
+            Attendance(student=student, academic_class=academic_class, date=day, status="Present")
+            for academic_class in admin_classes
+            for student in Student.objects.filter(section__academic_class=academic_class)
+            for day in ("2026-10-20", "2026-10-21", "2026-10-22")
+        ]
+        Attendance.objects.bulk_create(rows)
+        self.assertEqual(Student.objects.count(), 1000 + len(self.students))
+        self.assertEqual(Attendance.objects.count(), 3000)
+
+        self.client.force_login(self.teacher)
+        started = time.perf_counter()
+        response = self.client.get(
+            "/api/attendance/daily",
+            {"classId": admin_classes[7].pk, "date": "2026-10-21"},
+        )
+        elapsed = time.perf_counter() - started
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()["records"]), 50)
+        self.assertLess(elapsed, 2, f"Daily view took {elapsed:.2f}s")
