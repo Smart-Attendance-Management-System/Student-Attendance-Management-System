@@ -111,6 +111,11 @@ The admin-only `GET /api/attendance/summary` endpoint accepts `startDate` and
 `endDate` in `YYYY-MM-DD` format and returns `classes` and `grades` arrays with
 record totals, status counts, and `averagePercentage`.
 
+Daily attendance, student history, and attendance summary reports can be
+downloaded as PDF or Excel from their respective pages. The export endpoints
+use the same date, class, and student selections as the on-screen reports and
+preserve empty reports with their column headers and a no-records message.
+
 ## Academic structure management
 
 Admins can manage academic classes, sections, and subjects under:

@@ -7,9 +7,11 @@ from django.views.decorators.http import require_GET, require_POST
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
+from accounts.models import User
 from accounts.permissions import IsAdmin, IsStudentParent, IsTeacher
 
 from . import services
+from .exports import build_report_response
 from .models import Attendance
 
 
@@ -98,6 +100,145 @@ def attendance_summary_api(request):
     except services.AttendanceError as err:
         return Response({"status": "error", "message": err.message}, status=err.status_code)
     return Response({"status": "success", **data})
+
+
+@api_view(["GET"])
+@permission_classes([IsAdmin | IsTeacher | IsStudentParent])
+def attendance_report_export(request, report, file_format):
+    """Download a displayed attendance report as Excel or PDF."""
+    if file_format not in ("excel", "pdf"):
+        return Response(
+            {"status": "error", "message": "Format must be 'excel' or 'pdf'."},
+            status=400,
+        )
+
+    try:
+        if report == "summary":
+            if request.user.role != User.Role.ADMIN:
+                return Response(
+                    {"status": "error", "message": "Only admins can export summaries."},
+                    status=403,
+                )
+            data = services.get_attendance_summaries(
+                request.query_params.get("startDate"),
+                request.query_params.get("endDate"),
+            )
+            metadata = [
+                ("Period", f'{data["startDate"]} to {data["endDate"]}'),
+            ]
+            if not any(
+                item["totalRecords"] for item in data["classes"] + data["grades"]
+            ):
+                metadata.append(("Note", "No attendance records in this period."))
+            tables = [
+                (
+                    "By class",
+                    ["Class", "Total", "Present", "Absent", "Late", "Excused", "Average attendance"],
+                    [
+                        [
+                            item["className"],
+                            item["totalRecords"],
+                            item["present"],
+                            item["absent"],
+                            item["late"],
+                            item["excused"],
+                            f'{item["averagePercentage"]}%',
+                        ]
+                        for item in data["classes"]
+                    ],
+                ),
+                (
+                    "By grade",
+                    ["Grade", "Total", "Present", "Absent", "Late", "Excused", "Average attendance"],
+                    [
+                        [
+                            item["gradeName"],
+                            item["totalRecords"],
+                            item["present"],
+                            item["absent"],
+                            item["late"],
+                            item["excused"],
+                            f'{item["averagePercentage"]}%',
+                        ]
+                        for item in data["grades"]
+                    ],
+                ),
+            ]
+            title = "Attendance summaries"
+        elif report == "daily":
+            if request.user.role not in (User.Role.ADMIN, User.Role.TEACHER):
+                return Response(
+                    {"status": "error", "message": "You are not allowed to export this report."},
+                    status=403,
+                )
+            data = services.get_daily_attendance(
+                request.user,
+                request.query_params.get("classId"),
+                request.query_params.get("date"),
+            )
+            metadata = [
+                ("Class", data["className"]),
+                ("Date", data["date"]),
+                ("Marked", "Yes" if data["marked"] else "No"),
+                *[(status, count) for status, count in data["counts"].items()],
+            ]
+            tables = [
+                (
+                    "Attendance records",
+                    ["Roll no.", "Name", "Status", "Remarks"],
+                    [
+                        [item["rollNumber"], item["name"], item["status"], item["remarks"]]
+                        for item in data["records"]
+                    ],
+                )
+            ]
+            title = "Daily attendance"
+        elif report == "student":
+            student_id = request.query_params.get("studentId")
+            if not student_id or not student_id.isdigit():
+                raise services.AttendanceError(
+                    "studentId is required and must be a number.", 400
+                )
+            data = services.get_student_history(
+                request.user,
+                student_id,
+            )
+            student = data["student"]
+            metadata = [
+                ("Student", f'{student["name"]} (roll no. {student["rollNumber"]})'),
+                ("Class", student["className"]),
+                (
+                    "Attendance",
+                    f'{data["percentage"]}% ({data["presentDays"]} of {data["totalDays"]} school days)',
+                ),
+                *[(status, count) for status, count in data["counts"].items()],
+            ]
+            tables = [
+                (
+                    "Attendance history",
+                    ["Date", "Status", "Remarks"],
+                    [
+                        [item["date"], item["status"], item["remarks"]]
+                        for item in data["records"]
+                    ],
+                )
+            ]
+            title = "Student attendance"
+        else:
+            return Response(
+                {"status": "error", "message": "Unknown attendance report."},
+                status=404,
+            )
+    except services.AttendanceError as err:
+        return Response({"status": "error", "message": err.message}, status=err.status_code)
+
+    return build_report_response(
+        file_format,
+        title,
+        metadata,
+        tables,
+        f"attendance-{report}",
+    )
 
 
 @require_GET
