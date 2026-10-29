@@ -170,3 +170,59 @@ def get_daily_attendance(user, class_id, date_value):
             for r in records
         ],
     }
+
+# REQ4.2: which statuses count as "present" in the attendance percentage.
+# Late counts, because the student was in school. Absent and Excused do not.
+COUNTED_AS_PRESENT = ("Present", "Late")
+
+
+def calculate_attendance_summary(statuses):
+    """Days present / total school days, from a list of daily statuses."""
+    total = len(statuses)
+    present = sum(1 for status in statuses if status in COUNTED_AS_PRESENT)
+    percentage = round(present * 100 / total, 1) if total else 0.0
+    return {"totalDays": total, "presentDays": present, "percentage": percentage}
+
+
+def can_view_student(user, student):
+    """Admins see everyone, a teacher sees their own class, a parent sees their own child."""
+    if user.role == User.Role.ADMIN:
+        return True
+    if user.role == User.Role.TEACHER:
+        return bool(student.section_id) and is_class_teacher(
+            user, student.section.academic_class
+        )
+    if user.role == User.Role.STUDENT_PARENT:
+        return student.parent_id == user.pk
+    return False
+
+
+def get_student_history(user, student_id):
+    """REQ4.2: every attendance record for one student, plus their percentage."""
+    student = Student.objects.select_related("section__academic_class").filter(
+        pk=student_id
+    ).first()
+    if student is None:
+        raise AttendanceError("Student not found.", 404)
+    if not can_view_student(user, student):
+        raise AttendanceError("You are not allowed to view this student.", 403)
+
+    records = list(Attendance.objects.filter(student=student).order_by("-date"))
+    counts = {status: 0 for status in VALID_STATUSES}
+    for record in records:
+        counts[record.status] += 1
+
+    return {
+        "student": {
+            "id": student.pk,
+            "name": student.name,
+            "rollNumber": student.roll_number,
+            "className": student.student_class,
+        },
+        **calculate_attendance_summary([record.status for record in records]),
+        "counts": counts,
+        "records": [
+            {"date": r.date.isoformat(), "status": r.status, "remarks": r.remarks}
+            for r in records
+        ],
+    }

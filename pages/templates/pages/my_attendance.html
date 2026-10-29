@@ -1,0 +1,126 @@
+{% extends "pages/base.html" %}
+{% block title %}My attendance - SAMS{% endblock %}
+{% block content %}
+<h1 class="h3 mb-3">My attendance</h1>
+
+{% if not children %}
+  <div class="alert alert-secondary">
+    No student is linked to your account yet. Please ask the school admin to link your child's profile.
+  </div>
+{% else %}
+  <div class="row g-2 mb-4 align-items-end">
+    <div class="col-12 col-md-4">
+      <label for="studentSelect" class="form-label">Student</label>
+      <select id="studentSelect" class="form-select">
+        {% for child in children %}
+          <option value="{{ child.pk }}">{{ child.name }} ({{ child.student_class }})</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+
+  <div id="result"></div>
+
+  <script>
+    const BADGE = { Present: "success", Absent: "danger", Late: "warning", Excused: "info" };
+    const select = document.getElementById("studentSelect");
+    const result = document.getElementById("result");
+
+    function alertBox(kind, text) {
+      const div = document.createElement("div");
+      div.className = "alert alert-" + kind;
+      div.textContent = text;
+      return div;
+    }
+
+    function addCell(row, text) {
+      const td = document.createElement("td");
+      td.textContent = text;
+      row.appendChild(td);
+      return td;
+    }
+
+    function render(data) {
+      result.replaceChildren();
+
+      const heading = document.createElement("h2");
+      heading.className = "h5 mb-2";
+      heading.textContent = data.student.name + " (roll no. " + data.student.rollNumber + ")";
+      result.appendChild(heading);
+
+      if (data.totalDays === 0) {
+        result.appendChild(alertBox("secondary", "No attendance has been recorded yet."));
+        return;
+      }
+
+      const summary = document.createElement("p");
+      summary.className = "mb-2";
+      summary.textContent = "Attendance: " + data.percentage + "% (" + data.presentDays +
+                            " of " + data.totalDays + " school days)";
+      result.appendChild(summary);
+
+      const progress = document.createElement("div");
+      progress.className = "progress mb-3";
+      const bar = document.createElement("div");
+      bar.className = "progress-bar";
+      bar.style.width = data.percentage + "%";
+      bar.textContent = data.percentage + "%";
+      progress.appendChild(bar);
+      result.appendChild(progress);
+
+      const counts = document.createElement("div");
+      counts.className = "mb-3 d-flex flex-wrap gap-2";
+      Object.keys(BADGE).forEach(status => {
+        const badge = document.createElement("span");
+        badge.className = "badge text-bg-" + BADGE[status];
+        badge.textContent = status + ": " + data.counts[status];
+        counts.appendChild(badge);
+      });
+      result.appendChild(counts);
+
+      const wrapper = document.createElement("div");
+      wrapper.className = "table-responsive";
+      const table = document.createElement("table");
+      table.className = "table bg-white align-middle";
+      const head = table.createTHead().insertRow();
+      ["Date", "Status", "Remarks"].forEach(label => {
+        const th = document.createElement("th");
+        th.textContent = label;
+        head.appendChild(th);
+      });
+      const body = table.createTBody();
+      data.records.forEach(record => {
+        const row = body.insertRow();
+        addCell(row, record.date);
+        const statusCell = addCell(row, "");
+        const badge = document.createElement("span");
+        badge.className = "badge text-bg-" + (BADGE[record.status] || "secondary");
+        badge.textContent = record.status;
+        statusCell.appendChild(badge);
+        addCell(row, record.remarks || "");
+      });
+      wrapper.appendChild(table);
+      result.appendChild(wrapper);
+    }
+
+    async function load() {
+      result.replaceChildren(alertBox("light", "Loading..."));
+      try {
+        const response = await fetch("/api/attendance/student/" + encodeURIComponent(select.value),
+                                     { headers: { "Accept": "application/json" } });
+        const data = await response.json().catch(() => ({}));
+        if (response.ok) {
+          render(data);
+        } else {
+          result.replaceChildren(alertBox("danger", data.message || "Could not load attendance."));
+        }
+      } catch (err) {
+        result.replaceChildren(alertBox("danger", "Could not reach the server."));
+      }
+    }
+
+    select.addEventListener("change", load);
+    load();
+  </script>
+{% endif %}
+{% endblock %}

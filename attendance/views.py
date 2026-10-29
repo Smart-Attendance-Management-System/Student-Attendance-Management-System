@@ -7,7 +7,7 @@ from django.views.decorators.http import require_GET, require_POST
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
-from accounts.permissions import IsAdmin, IsTeacher
+from accounts.permissions import IsAdmin, IsStudentParent, IsTeacher
 
 from . import services
 from .models import Attendance
@@ -94,3 +94,13 @@ def health_check(request):
     except Exception:
         return JsonResponse({"status": "error", "database": "down"}, status=503)
     return JsonResponse({"status": "ok", "database": "up"})
+
+@api_view(["GET"])
+@permission_classes([IsAdmin | IsTeacher | IsStudentParent])
+def student_history_api(request, student_id):
+    """GET /api/attendance/student/<id>  (REQ4.2)"""
+    try:
+        data = services.get_student_history(request.user, student_id)
+    except services.AttendanceError as err:
+        return Response({"status": "error", "message": err.message}, status=err.status_code)
+    return Response({"status": "success", **data})
