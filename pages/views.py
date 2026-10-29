@@ -35,10 +35,10 @@ def role_required(*roles):
 
 @login_required(login_url="login")
 def home(request):
-    if request.user.role == User.Role.TEACHER:
-        return redirect("pages:mark_attendance")
     if request.user.role == User.Role.ADMIN:
         return redirect("pages:student_list")
+    if request.user.role == User.Role.STUDENT_PARENT:
+        return redirect("pages:my_attendance")
     return render(request, "pages/home.html")
 
 
@@ -82,3 +82,9 @@ def daily_attendance(request):
         "pages/daily_attendance.html",
         {"classes": classes, "today": timezone.localdate()},
     )
+
+@role_required(User.Role.STUDENT_PARENT)
+def my_attendance(request):
+    """REQ4.2 screen: a parent sees the attendance history of their own children."""
+    children = request.user.children.order_by("name")
+    return render(request, "pages/my_attendance.html", {"children": children})

@@ -478,3 +478,121 @@ class ScaleAndIndexTests(AttendanceTestBase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.json()["records"]), 50)
         self.assertLess(elapsed, 2, f"Daily view took {elapsed:.2f}s")
+
+class AttendanceSummaryUnitTests(TestCase):
+    """REQ4.2: percentage = days present / total school days."""
+
+    def test_no_days_gives_zero_and_does_not_crash(self):
+        self.assertEqual(
+            services.calculate_attendance_summary([]),
+            {"totalDays": 0, "presentDays": 0, "percentage": 0.0},
+        )
+
+    def test_all_present_is_100_percent(self):
+        summary = services.calculate_attendance_summary(["Present"] * 4)
+        self.assertEqual(summary["percentage"], 100.0)
+
+    def test_late_counts_as_present_but_absent_and_excused_do_not(self):
+        summary = services.calculate_attendance_summary(
+            ["Present", "Late", "Absent", "Excused"]
+        )
+        self.assertEqual(
+            summary, {"totalDays": 4, "presentDays": 2, "percentage": 50.0}
+        )
+
+    def test_percentage_is_rounded_to_one_decimal(self):
+        summary = services.calculate_attendance_summary(["Present", "Present", "Absent"])
+        self.assertEqual(summary["percentage"], 66.7)
+
+
+class StudentHistoryApiTests(AttendanceTestBase):
+    """REQ4.2: a student's history and percentage, visible only to the right people."""
+
+    def setUp(self):
+        super().setUp()
+        self.parent = User.objects.create_user(
+            username="parent1", password="pass12345", role=User.Role.STUDENT_PARENT
+        )
+        self.other_parent = User.objects.create_user(
+            username="parent2", password="pass12345", role=User.Role.STUDENT_PARENT
+        )
+        self.child, self.other_child, self.unlinked_child = self.students
+        self.child.parent = self.parent
+        self.child.save()
+        self.other_child.parent = self.other_parent
+        self.other_child.save()
+
+        # Day 1: everyone present. Day 2: child Absent. Day 3: child Late.
+        services.mark_attendance(self.teacher, self.cls.pk, "2026-10-20", [])
+        services.mark_attendance(
+            self.teacher, self.cls.pk, "2026-10-21",
+            [{"studentId": self.child.pk, "status": "Absent"}],
+        )
+        services.mark_attendance(
+            self.teacher, self.cls.pk, "2026-10-22",
+            [{"studentId": self.child.pk, "status": "Late", "remarks": "Bus"}],
+        )
+
+    def history(self, student):
+        return self.client.get(f"/api/attendance/student/{student.pk}")
+
+    def test_parent_sees_their_own_childs_history_and_percentage(self):
+        self.client.force_login(self.parent)
+        response = self.history(self.child)
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["student"]["name"], "Student 1")
+        self.assertEqual(body["totalDays"], 3)
+        self.assertEqual(body["presentDays"], 2)
+        self.assertEqual(body["percentage"], 66.7)
+        self.assertEqual(
+            body["counts"], {"Present": 1, "Absent": 1, "Late": 1, "Excused": 0}
+        )
+        # Newest first
+        self.assertEqual(
+            [(r["date"], r["status"]) for r in body["records"]],
+            [("2026-10-22", "Late"), ("2026-10-21", "Absent"), ("2026-10-20", "Present")],
+        )
+        self.assertEqual(body["records"][0]["remarks"], "Bus")
+
+    def test_parent_cannot_see_another_students_data(self):
+        self.client.force_login(self.parent)
+        self.assertEqual(self.history(self.other_child).status_code, 403)
+
+    def test_parent_cannot_see_a_student_who_is_not_linked_to_anyone(self):
+        self.client.force_login(self.parent)
+        self.assertEqual(self.history(self.unlinked_child).status_code, 403)
+
+    def test_parent_with_no_linked_children_gets_403(self):
+        stranger = User.objects.create_user(
+            username="parent3", password="pass12345", role=User.Role.STUDENT_PARENT
+        )
+        self.client.force_login(stranger)
+        self.assertEqual(self.history(self.child).status_code, 403)
+
+    def test_admin_can_see_any_student(self):
+        self.client.force_login(self.admin)
+        self.assertEqual(self.history(self.unlinked_child).status_code, 200)
+
+    def test_class_teacher_can_see_their_student_but_other_teacher_cannot(self):
+        self.client.force_login(self.teacher)
+        self.assertEqual(self.history(self.child).status_code, 200)
+        self.client.force_login(self.other_teacher)
+        self.assertEqual(self.history(self.child).status_code, 403)
+
+    def test_not_logged_in_is_refused(self):
+        self.assertIn(self.history(self.child).status_code, (401, 403))
+
+    def test_unknown_student_gets_404(self):
+        self.client.force_login(self.admin)
+        self.assertEqual(self.client.get("/api/attendance/student/9999").status_code, 404)
+
+    def test_student_with_no_records_returns_zero_days(self):
+        newcomer = Student.objects.create(
+            name="Newcomer", student_class="Grade 10", roll_number=50,
+            contact_details="new@example.com", section=self.child.section,
+            parent=self.parent,
+        )
+        self.client.force_login(self.parent)
+        body = self.history(newcomer).json()
+        self.assertEqual((body["totalDays"], body["percentage"], body["records"]), (0, 0.0, []))

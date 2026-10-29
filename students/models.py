@@ -99,6 +99,15 @@ class Student(models.Model):
         blank=True,
         null=True,
     )
+    parent = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="children",
+        blank=True,
+        null=True,
+        limit_choices_to={"role": "STUDENT_PARENT"},
+        help_text="The Student/Parent account that can view this student's attendance.",
+    )
 
     class Meta:
         ordering = ["student_class", "roll_number"]

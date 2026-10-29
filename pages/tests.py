@@ -7,7 +7,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from accounts.models import User
-from students.models import AcademicClass
+from students.models import AcademicClass, Section, Student
 
 class PageAccessTests(TestCase):
     def make_user(self, role):
@@ -151,3 +151,61 @@ class DailyPageAndNavigationTests(TestCase):
     def test_login_page_links_to_admin_site(self):
         response = self.client.get(reverse("login"))
         self.assertContains(response, reverse("admin:index"))
+
+class MyAttendancePageTests(TestCase):
+    def make_parent(self, username="parent1"):
+        return User.objects.create_user(
+            username=username, password="pass12345", role=User.Role.STUDENT_PARENT
+        )
+
+    def make_child(self, parent, name="Asha Rao"):
+        section = Section.objects.create(
+            academic_class=AcademicClass.objects.create(name="Grade 10"), name="A"
+        )
+        return Student.objects.create(
+            name=name, student_class="Grade 10", roll_number=1,
+            contact_details="asha@example.com", section=section, parent=parent,
+        )
+
+    def test_parent_sees_their_child_on_the_page(self):
+        parent = self.make_parent()
+        self.make_child(parent)
+        self.client.force_login(parent)
+        response = self.client.get(reverse("pages:my_attendance"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "My attendance")
+        self.assertContains(response, "Asha Rao")
+
+    def test_parent_with_no_linked_child_sees_a_clear_message(self):
+        self.client.force_login(self.make_parent())
+        response = self.client.get(reverse("pages:my_attendance"))
+        self.assertContains(response, "No student is linked to your account")
+
+    def test_parent_does_not_see_other_parents_children(self):
+        self.make_child(self.make_parent("parent2"), name="Someone Else")
+        mine = self.make_parent("parent1")
+        self.client.force_login(mine)
+        response = self.client.get(reverse("pages:my_attendance"))
+        self.assertNotContains(response, "Someone Else")
+
+    def test_home_sends_a_parent_to_the_attendance_page(self):
+        self.client.force_login(self.make_parent())
+        response = self.client.get(reverse("pages:home"))
+        self.assertRedirects(
+            response, reverse("pages:my_attendance"), fetch_redirect_response=False
+        )
+
+    def test_teacher_is_redirected_away_and_has_no_nav_link(self):
+        teacher = User.objects.create_user(
+            username="teacher1", password="pass12345", role=User.Role.TEACHER
+        )
+        self.client.force_login(teacher)
+        response = self.client.get(reverse("pages:my_attendance"))
+        self.assertRedirects(response, reverse("pages:home"), fetch_redirect_response=False)
+        page = self.client.get(reverse("pages:mark_attendance"))
+        self.assertNotContains(page, "My attendance")
+
+    def test_anonymous_is_sent_to_login(self):
+        response = self.client.get(reverse("pages:my_attendance"))
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.url.startswith(reverse("login")))
