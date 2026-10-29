@@ -85,6 +85,21 @@ def daily_attendance_api(request):
         return Response({"status": "error", "message": err.message}, status=err.status_code)
     return Response({"status": "success", **data})
 
+
+@api_view(["GET"])
+@permission_classes([IsAdmin])
+def attendance_summary_api(request):
+    """GET /api/attendance/summary?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD"""
+    try:
+        data = services.get_attendance_summaries(
+            request.query_params.get("startDate"),
+            request.query_params.get("endDate"),
+        )
+    except services.AttendanceError as err:
+        return Response({"status": "error", "message": err.message}, status=err.status_code)
+    return Response({"status": "success", **data})
+
+
 @require_GET
 def health_check(request):
     """GET /health/  (NFR3) Simple uptime check an uptime monitor can ping."""

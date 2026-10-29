@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
 from django.utils import timezone
@@ -82,6 +84,21 @@ def daily_attendance(request):
         "pages/daily_attendance.html",
         {"classes": classes, "today": timezone.localdate()},
     )
+
+
+@role_required(User.Role.ADMIN)
+def attendance_summary(request):
+    """Admin report for attendance grouped by class and grade."""
+    today = timezone.localdate()
+    return render(
+        request,
+        "pages/attendance_summary.html",
+        {
+            "today": today,
+            "month_ago": today - timedelta(days=29),
+        },
+    )
+
 
 @role_required(User.Role.STUDENT_PARENT)
 def my_attendance(request):

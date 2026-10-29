@@ -18,6 +18,9 @@
       {% if user.role == "ADMIN" or user.role == "TEACHER" %}
       <a class="link-light" href="{% url 'pages:daily_attendance' %}">Daily view</a>
       {% endif %}
+      {% if user.role == "ADMIN" %}
+      <a class="link-light" href="{% url 'pages:attendance_summary' %}">Attendance summaries</a>
+      {% endif %}
       {% if user.role == "STUDENT_PARENT" %}
       <a class="link-light" href="{% url 'pages:my_attendance' %}">My attendance</a>
       {% endif %}
