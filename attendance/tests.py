@@ -282,6 +282,19 @@ class DailyAttendanceApiTests(AttendanceTestBase):
         self.assertFalse(body["marked"])
         self.assertTrue(self.get_daily(date="2026-10-22").json()["marked"])
 
+    def test_student_filter_returns_only_that_students_record_and_counts(self):
+        self.mark_with_exceptions()
+        self.client.force_login(self.teacher)
+        response = self.client.get(
+            self.url,
+            {"classId": self.cls.pk, "date": TODAY, "studentId": self.students[1].pk},
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(len(body["records"]), 1)
+        self.assertEqual(body["records"][0]["studentId"], self.students[1].pk)
+        self.assertEqual(body["counts"]["Absent"], 1)
+
     def test_admin_can_view_any_class(self):
         self.mark_with_exceptions()
         self.client.force_login(self.admin)
@@ -616,6 +629,98 @@ class AttendanceSummaryApiTests(AttendanceTestBase):
                     403,
                 )
 
+    def test_summary_filters_by_date_class_and_student_with_and_semantics(self):
+        other_class = AcademicClass.objects.create(name="Grade 9")
+        other_section = Section.objects.create(academic_class=other_class, name="A")
+        other_student = Student.objects.create(
+            name="Other student",
+            student_class="Grade 9",
+            roll_number=90,
+            contact_details="other@example.com",
+            section=other_section,
+        )
+        services.mark_attendance(self.teacher, self.cls.pk, "2026-10-19", [])
+        services.mark_attendance(
+            self.teacher,
+            self.cls.pk,
+            "2026-10-20",
+            [{"studentId": self.students[0].pk, "status": "Absent"}],
+        )
+        Attendance.objects.create(
+            student=other_student,
+            academic_class=other_class,
+            date="2026-10-20",
+            status="Present",
+        )
+
+        self.client.force_login(self.admin)
+        params = {
+            "startDate": "2026-10-20",
+            "endDate": "2026-10-20",
+            "classId": self.cls.pk,
+            "studentId": self.students[0].pk,
+        }
+        response = self.client.get(self.url, params)
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["classes"][0]["totalRecords"], 1)
+        self.assertEqual(body["classes"][0]["absent"], 1)
+        self.assertEqual(body["classes"][0]["averagePercentage"], 0.0)
+        self.assertEqual(body["grades"][0]["totalRecords"], 1)
+
+    def test_summary_class_and_student_filters_can_be_used_individually(self):
+        services.mark_attendance(
+            self.teacher,
+            self.cls.pk,
+            "2026-10-20",
+            [{"studentId": self.students[0].pk, "status": "Absent"}],
+        )
+        self.client.force_login(self.admin)
+        class_response = self.client.get(
+            self.url,
+            {"startDate": "2026-10-20", "endDate": "2026-10-20", "classId": self.cls.pk},
+        )
+        self.assertEqual(class_response.status_code, 200)
+        self.assertEqual(class_response.json()["grades"][0]["totalRecords"], 3)
+        student_response = self.client.get(
+            self.url,
+            {"startDate": "2026-10-20", "endDate": "2026-10-20", "studentId": self.students[0].pk},
+        )
+        self.assertEqual(student_response.status_code, 200)
+        self.assertEqual(student_response.json()["grades"][0]["totalRecords"], 1)
+
+    def test_summary_filters_return_empty_scoped_totals(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(
+            self.url,
+            {
+                "startDate": "2026-10-20",
+                "endDate": "2026-10-20",
+                "classId": self.cls.pk,
+                "studentId": self.students[0].pk,
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["classes"][0]["totalRecords"], 0)
+        self.assertEqual(response.json()["grades"][0]["averagePercentage"], 0.0)
+
+    def test_summary_rejects_invalid_filter_identifiers(self):
+        self.client.force_login(self.admin)
+        for key, value in (("classId", "not-a-number"), ("studentId", "not-a-number")):
+            response = self.client.get(
+                self.url,
+                {"startDate": TODAY, "endDate": TODAY, key: value},
+            )
+            with self.subTest(key=key):
+                self.assertEqual(response.status_code, 400)
+        for key in ("classId", "studentId"):
+            response = self.client.get(
+                self.url,
+                {"startDate": TODAY, "endDate": TODAY, key: 9999},
+            )
+            with self.subTest(missing=key):
+                self.assertEqual(response.status_code, 404)
+
 
 class AttendanceReportExportTests(AttendanceTestBase):
     base_url = "/api/attendance/reports"
@@ -840,3 +945,43 @@ class StudentHistoryApiTests(AttendanceTestBase):
         self.client.force_login(self.parent)
         body = self.history(newcomer).json()
         self.assertEqual((body["totalDays"], body["percentage"], body["records"]), (0, 0.0, []))
+
+    def test_history_date_and_class_filters_recalculate_percentage(self):
+        self.client.force_login(self.parent)
+        response = self.client.get(
+            f"/api/attendance/student/{self.child.pk}",
+            {
+                "startDate": "2026-10-21",
+                "endDate": "2026-10-22",
+                "classId": self.cls.pk,
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["totalDays"], 2)
+        self.assertEqual(body["presentDays"], 1)
+        self.assertEqual(body["percentage"], 50.0)
+        self.assertEqual(len(body["records"]), 2)
+
+    def test_history_filters_validate_dates_and_class(self):
+        self.client.force_login(self.parent)
+        response = self.client.get(
+            f"/api/attendance/student/{self.child.pk}",
+            {"startDate": "bad-date", "endDate": "2026-10-22"},
+        )
+        self.assertEqual(response.status_code, 400)
+        response = self.client.get(
+            f"/api/attendance/student/{self.child.pk}",
+            {"startDate": "2026-10-21", "endDate": "2026-10-20"},
+        )
+        self.assertEqual(response.status_code, 400)
+        response = self.client.get(
+            f"/api/attendance/student/{self.child.pk}",
+            {"classId": "bad-class"},
+        )
+        self.assertEqual(response.status_code, 400)
+        response = self.client.get(
+            f"/api/attendance/student/{self.child.pk}",
+            {"classId": 9999},
+        )
+        self.assertEqual(response.status_code, 404)
