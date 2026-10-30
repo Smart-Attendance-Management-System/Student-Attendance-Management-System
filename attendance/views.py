@@ -76,12 +76,13 @@ def edit_attendance_api(request, pk):
 @api_view(["GET"])
 @permission_classes([IsAdmin | IsTeacher])
 def daily_attendance_api(request):
-    """GET /api/attendance/daily?classId=1&date=2026-10-23  (REQ4.1)"""
+    """GET /api/attendance/daily?classId=1&date=2026-10-23&studentId=2  (REQ4.1/4.4)"""
     try:
         data = services.get_daily_attendance(
             request.user,
             request.query_params.get("classId"),
             request.query_params.get("date"),
+            request.query_params.get("studentId"),
         )
     except services.AttendanceError as err:
         return Response({"status": "error", "message": err.message}, status=err.status_code)
@@ -91,11 +92,13 @@ def daily_attendance_api(request):
 @api_view(["GET"])
 @permission_classes([IsAdmin])
 def attendance_summary_api(request):
-    """GET /api/attendance/summary?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD"""
+    """GET /api/attendance/summary?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD&classId=1&studentId=2"""
     try:
         data = services.get_attendance_summaries(
             request.query_params.get("startDate"),
             request.query_params.get("endDate"),
+            request.query_params.get("classId"),
+            request.query_params.get("studentId"),
         )
     except services.AttendanceError as err:
         return Response({"status": "error", "message": err.message}, status=err.status_code)
@@ -122,6 +125,8 @@ def attendance_report_export(request, report, file_format):
             data = services.get_attendance_summaries(
                 request.query_params.get("startDate"),
                 request.query_params.get("endDate"),
+                request.query_params.get("classId"),
+                request.query_params.get("studentId"),
             )
             metadata = [
                 ("Period", f'{data["startDate"]} to {data["endDate"]}'),
@@ -175,6 +180,7 @@ def attendance_report_export(request, report, file_format):
                 request.user,
                 request.query_params.get("classId"),
                 request.query_params.get("date"),
+                request.query_params.get("studentId"),
             )
             metadata = [
                 ("Class", data["className"]),
@@ -202,6 +208,9 @@ def attendance_report_export(request, report, file_format):
             data = services.get_student_history(
                 request.user,
                 student_id,
+                request.query_params.get("startDate"),
+                request.query_params.get("endDate"),
+                request.query_params.get("classId"),
             )
             student = data["student"]
             metadata = [
@@ -254,9 +263,15 @@ def health_check(request):
 @api_view(["GET"])
 @permission_classes([IsAdmin | IsTeacher | IsStudentParent])
 def student_history_api(request, student_id):
-    """GET /api/attendance/student/<id>  (REQ4.2)"""
+    """GET /api/attendance/student/<id>?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD&classId=1  (REQ4.2/4.4)"""
     try:
-        data = services.get_student_history(request.user, student_id)
+        data = services.get_student_history(
+            request.user,
+            student_id,
+            request.query_params.get("startDate"),
+            request.query_params.get("endDate"),
+            request.query_params.get("classId"),
+        )
     except services.AttendanceError as err:
         return Response({"status": "error", "message": err.message}, status=err.status_code)
     return Response({"status": "success", **data})
