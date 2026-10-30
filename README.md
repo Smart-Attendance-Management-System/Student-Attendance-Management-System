@@ -130,7 +130,30 @@ selected period are shown with zero totals.
 
 The admin-only `GET /api/attendance/summary` endpoint accepts `startDate` and
 `endDate` in `YYYY-MM-DD` format and returns `classes` and `grades` arrays with
-record totals, status counts, and `averagePercentage`.
+record totals, status counts, and `averagePercentage`. Reports support these
+optional filters, which can be combined with AND semantics:
+
+- `classId`: numeric academic class identifier.
+- `studentId`: numeric student identifier.
+- `startDate` and `endDate`: inclusive date range in `YYYY-MM-DD` format.
+
+Examples:
+
+```text
+GET /api/attendance/summary?startDate=2026-10-01&endDate=2026-10-31&classId=3&studentId=12
+GET /api/attendance/student/12?startDate=2026-10-01&endDate=2026-10-31&classId=3
+GET /api/attendance/daily?classId=3&date=2026-10-15&studentId=12
+```
+
+The extended report endpoints are `GET /api/attendance/summary` (REQ4.3),
+`GET /api/attendance/student/<studentId>` (REQ4.2), and
+`GET /api/attendance/daily` (REQ4.1). Their existing response formats and
+authorization rules are unchanged when filters are omitted. The summary remains
+admin-only; daily reports remain available to admins and assigned class
+teachers; student history remains restricted to admins, assigned class
+teachers, and the student's parent. Missing or malformed dates and identifiers
+return a validation error, while valid filters with no matching attendance
+return zero totals and percentages.
 
 Daily attendance, student history, and attendance summary reports can be
 downloaded as PDF or Excel from their respective pages. The export endpoints
