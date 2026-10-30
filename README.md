@@ -17,6 +17,109 @@ python manage.py migrate
 python manage.py runserver
 ```
 
+## Application structure and maintainability
+
+The project follows Django's MVC-style boundaries:
+
+- `models.py` files define database entities, relationships, indexes, and
+  constraints.
+- `views.py` files handle authentication, HTTP input/output, redirects, and
+  API response formatting.
+- Reusable business rules belong in app services, especially
+  `attendance/services.py` and `notifications/services.py`.
+- URL modules only map routes to views; they do not contain business logic.
+- Management commands are reserved for explicit operational or maintenance
+  tasks, such as the database backup command described below.
+
+The durable attendance edit history remains `notifications.AuditLog`. It
+records who changed an attendance entry, what changed, and when. Application
+logs are separate diagnostic records and must not be used as a replacement for
+that audit trail.
+
+## Application logging
+
+Logging is configured centrally in `sams_project/settings.py`. The `sams`
+logger writes timestamped records with level and logger name to the console at
+`INFO` by default. Change the diagnostic threshold with
+`SAMS_LOG_LEVEL=WARNING` (or another standard Python level).
+
+For deployments that need a rotating file, set `SAMS_LOG_FILE` to a
+directory/file owned by the service account and outside the repository:
+
+```powershell
+$env:SAMS_LOG_LEVEL="INFO"
+$env:SAMS_LOG_FILE="C:\var\log\sams\application.log"
+python manage.py runserver
+```
+
+Attendance submissions, rejected submissions, attendance edits, student
+profile actions, class/section/subject catalog actions, imports, and backup or
+restore operations are logged. Messages use user and record identifiers rather
+than student contact details, passwords, session tokens, or request bodies.
+Configure log rotation and access permissions at the deployment boundary.
+
+## Database backup and restore
+
+The supported backends are SQLite for local development/testing and MySQL for
+deployment. Backups must be stored outside the repository, such as
+`C:\var\backups\sams` or `/var/backups/sams`; the repository ignores common
+backup and log extensions.
+
+### SQLite
+
+Prerequisites: the configured SQLite database must be accessible to the
+service account. Create a backup without replacing an existing file:
+
+```powershell
+$env:USE_SQLITE="1"
+python manage.py backup_database backup --output C:\var\backups\sams\attendance-2026-10-30.sqlite3
+```
+
+Restore only after selecting the backup and confirming the live database is
+the intended target:
+
+```powershell
+$env:USE_SQLITE="1"
+python manage.py backup_database restore `
+  --input C:\var\backups\sams\attendance-2026-10-30.sqlite3 `
+  --confirm-restore
+```
+
+The command refuses to overwrite an existing backup unless `--force` is
+provided. Restore always requires `--confirm-restore`; it does not happen
+automatically. After a restore, verify the result with:
+
+```powershell
+$env:USE_SQLITE="1"
+python manage.py check
+python manage.py showmigrations
+python manage.py shell -c "from attendance.models import Attendance; print(Attendance.objects.count())"
+```
+
+SQLite backups use SQLite's online backup API rather than copying a live file
+blindly.
+
+### MySQL
+
+Prerequisites: `mysqldump` and `mysql` must be installed and available on
+`PATH`. Configure `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, and
+`DB_PORT` as deployment environment variables; never place credentials in a
+backup command or committed file:
+
+```powershell
+python manage.py backup_database backup --output C:\var\backups\sams\attendance-2026-10-30.sql
+python manage.py backup_database restore `
+  --input C:\var\backups\sams\attendance-2026-10-30.sql `
+  --confirm-restore
+```
+
+The MySQL path uses `mysqldump --single-transaction --routines --triggers`
+and streams restore input to `mysql`. It does not support replacing a live
+database implicitly; the explicit confirmation flag is required. Verify the
+restored data with `python manage.py check` and a read-only Django shell query
+as shown above. Test restoration against a disposable database first when
+operationally possible.
+
 ## Login API
 
 `POST /api/auth/login` accepts a JSON body with `username` and `password`.
