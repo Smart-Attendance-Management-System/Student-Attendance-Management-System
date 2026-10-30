@@ -1,7 +1,11 @@
 import datetime
 import json
+import logging
+import sqlite3
+import tempfile
 import time
 from io import BytesIO
+from pathlib import Path
 
 from openpyxl import load_workbook
 from unittest.mock import patch
@@ -15,6 +19,7 @@ from notifications.models import AuditLog
 from students.models import AcademicClass, Section, Student
 
 from . import services
+from .management.commands.backup_database import Command as BackupCommand
 from .models import Attendance
 
 TODAY = "2026-10-23"
@@ -110,6 +115,13 @@ class MarkAttendanceApiTests(AttendanceTestBase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json()["savedCount"], 3)
         self.assertEqual(Attendance.objects.count(), 3)
+
+    def test_attendance_submission_writes_a_safe_application_log_event(self):
+        with self.assertLogs("sams.attendance", level=logging.INFO) as captured:
+            services.mark_attendance(self.teacher, self.cls.pk, TODAY, [])
+
+        self.assertTrue(any("Attendance submitted" in message for message in captured.output))
+        self.assertTrue(all("pass12345" not in message for message in captured.output))
 
     def test_all_four_statuses_are_saved(self):
         self.client.force_login(self.teacher)
@@ -946,6 +958,7 @@ class StudentHistoryApiTests(AttendanceTestBase):
         body = self.history(newcomer).json()
         self.assertEqual((body["totalDays"], body["percentage"], body["records"]), (0, 0.0, []))
 
+
     def test_history_date_and_class_filters_recalculate_percentage(self):
         self.client.force_login(self.parent)
         response = self.client.get(
@@ -985,3 +998,38 @@ class StudentHistoryApiTests(AttendanceTestBase):
             {"classId": 9999},
         )
         self.assertEqual(response.status_code, 404)
+
+
+class DatabaseBackupCommandTests(TestCase):
+    def test_sqlite_backup_and_restore_round_trip(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source_path = Path(directory) / "source.sqlite3"
+            backup_path = Path(directory) / "sams.sqlite3"
+            restored_path = Path(directory) / "restored.sqlite3"
+            database = sqlite3.connect(source_path)
+            try:
+                database.execute("CREATE TABLE sample (value TEXT NOT NULL)")
+                database.execute("INSERT INTO sample VALUES ('before')")
+                database.commit()
+            finally:
+                database.close()
+
+            command = BackupCommand()
+            command._sqlite_backup(source_path, backup_path)
+            self.assertTrue(backup_path.is_file())
+            self.assertGreater(backup_path.stat().st_size, 0)
+
+            database = sqlite3.connect(source_path)
+            try:
+                database.execute("UPDATE sample SET value = 'after'")
+                database.commit()
+            finally:
+                database.close()
+
+            command._sqlite_restore(backup_path, restored_path)
+            database = sqlite3.connect(restored_path)
+            try:
+                restored = database.execute("SELECT value FROM sample").fetchone()[0]
+            finally:
+                database.close()
+            self.assertEqual(restored, "before")
