@@ -4,3 +4,9 @@ __pycache__/
 db.sqlite3
 .env
 .vscode/
+logs/
+backups/
+*.log
+*.bak
+*.dump
+*.sql

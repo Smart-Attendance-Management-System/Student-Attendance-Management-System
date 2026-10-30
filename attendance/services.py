@@ -1,6 +1,7 @@
 """Business rules for marking and editing attendance."""
 
 import datetime
+import logging
 
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Q
@@ -12,6 +13,7 @@ from students.models import AcademicClass, Section, Student
 from .models import Attendance
 
 VALID_STATUSES = [choice for choice, _ in Attendance.Status.choices]
+logger = logging.getLogger("sams.attendance")
 
 
 class AttendanceError(Exception):
@@ -55,16 +57,28 @@ def mark_attendance(teacher, class_id, date_value, records):
     """
     academic_class = AcademicClass.objects.filter(pk=class_id).first()
     if academic_class is None:
+        logger.warning("Attendance submission rejected: class not found class_id=%s", class_id)
         raise AttendanceError("Class not found.", 400)
     if not is_class_teacher(teacher, academic_class):
+        logger.warning(
+            "Attendance submission rejected: unassigned teacher user_id=%s class_id=%s",
+            teacher.pk,
+            academic_class.pk,
+        )
         raise AttendanceError("You are not assigned to this class.", 403)
 
     date = parse_date(date_value)
     if not isinstance(records, list):
+        logger.warning(
+            "Attendance submission rejected: records must be a list user_id=%s class_id=%s",
+            teacher.pk,
+            academic_class.pk,
+        )
         raise AttendanceError("Records must be a list.", 400)
 
     students = {s.pk: s for s in Student.objects.filter(section__academic_class=academic_class)}
     if not students:
+        logger.warning("Attendance submission rejected: class has no students class_id=%s", academic_class.pk)
         raise AttendanceError("This class has no students.", 400)
 
     statuses = {}
@@ -72,12 +86,28 @@ def mark_attendance(teacher, class_id, date_value, records):
         student_id = record.get("studentId") if isinstance(record, dict) else None
         status = record.get("status") if isinstance(record, dict) else None
         if student_id not in students:
+            logger.warning(
+                "Attendance submission rejected: student not in class user_id=%s class_id=%s",
+                teacher.pk,
+                academic_class.pk,
+            )
             raise AttendanceError(f"Student {student_id} is not in this class.", 400)
         if not is_valid_status(status):
+            logger.warning(
+                "Attendance submission rejected: invalid status user_id=%s class_id=%s",
+                teacher.pk,
+                academic_class.pk,
+            )
             raise AttendanceError(f"Invalid status: {status}.", 400)
         statuses[student_id] = (status, (record.get("remarks") or "")[:255])
 
     if attendance_exists(academic_class, date):
+        logger.info(
+            "Attendance submission rejected: already marked user_id=%s class_id=%s date=%s",
+            teacher.pk,
+            academic_class.pk,
+            date,
+        )
         raise AttendanceError("Attendance already marked for this class and date.", 409)
 
     entries = [
@@ -95,14 +125,32 @@ def mark_attendance(teacher, class_id, date_value, records):
         with transaction.atomic():
             Attendance.objects.bulk_create(entries)
     except IntegrityError:
+        logger.exception(
+            "Attendance submission conflicted with an existing record user_id=%s class_id=%s date=%s",
+            teacher.pk,
+            academic_class.pk,
+            date,
+        )
         # Two submissions at the same moment: the database blocks the second one
         raise AttendanceError("Attendance already marked for this class and date.", 409)
+    logger.info(
+        "Attendance submitted user_id=%s class_id=%s date=%s record_count=%s",
+        teacher.pk,
+        academic_class.pk,
+        date,
+        len(entries),
+    )
     return entries
 
 
 def edit_attendance(user, attendance, new_status, remarks=None):
     """Change one student's status and record the change in the audit log."""
     if not is_class_teacher(user, attendance.academic_class):
+        logger.warning(
+            "Attendance edit rejected: unassigned teacher user_id=%s attendance_id=%s",
+            user.pk,
+            attendance.pk,
+        )
         raise AttendanceError("You are not assigned to this class.", 403)
     if not is_valid_status(new_status):
         raise AttendanceError(f"Invalid status: {new_status}.", 400)
@@ -121,9 +169,17 @@ def edit_attendance(user, attendance, new_status, remarks=None):
         class_id=attendance.academic_class_id,
         attendance_date=attendance.date,
     )
+    logger.info(
+        "Attendance edited user_id=%s attendance_id=%s class_id=%s old_status=%s new_status=%s",
+        user.pk,
+        attendance.pk,
+        attendance.academic_class_id,
+        old_status,
+        new_status,
+    )
     return attendance
 
-def get_daily_attendance(user, class_id, date_value):
+def get_daily_attendance(user, class_id, date_value, student_id=None):
     """REQ4.1: every student's status for one class on one date.
 
     Admins can view any class. A teacher can only view a class they are
@@ -142,11 +198,16 @@ def get_daily_attendance(user, class_id, date_value):
         raise AttendanceError("You are not assigned to this class.", 403)
 
     date = parse_date(date_value)
-    records = list(
-        Attendance.objects.filter(academic_class=academic_class, date=date)
-        .select_related("student")
-        .order_by("student__roll_number")
-    )
+    records_query = Attendance.objects.filter(academic_class=academic_class, date=date)
+    if student_id is not None:
+        try:
+            student_id = int(student_id)
+        except (TypeError, ValueError):
+            raise AttendanceError("studentId must be a number.", 400)
+        if not Student.objects.filter(pk=student_id).exists():
+            raise AttendanceError("Student not found.", 404)
+        records_query = records_query.filter(student_id=student_id)
+    records = list(records_query.select_related("student").order_by("student__roll_number"))
 
     counts = {status: 0 for status in VALID_STATUSES}
     for record in records:
@@ -198,7 +259,7 @@ def can_view_student(user, student):
     return False
 
 
-def get_student_history(user, student_id):
+def get_student_history(user, student_id, start_date_value=None, end_date_value=None, class_id=None):
     """REQ4.2: every attendance record for one student, plus their percentage."""
     student = Student.objects.select_related("section__academic_class").filter(
         pk=student_id
@@ -208,7 +269,28 @@ def get_student_history(user, student_id):
     if not can_view_student(user, student):
         raise AttendanceError("You are not allowed to view this student.", 403)
 
-    records = list(Attendance.objects.filter(student=student).order_by("-date"))
+    date_filters = {}
+    if start_date_value is not None or end_date_value is not None:
+        if start_date_value is None or end_date_value is None:
+            raise AttendanceError("startDate and endDate must be provided together.", 400)
+        start_date = parse_date(start_date_value)
+        end_date = parse_date(end_date_value)
+        if start_date > end_date:
+            raise AttendanceError("Start date must be on or before end date.", 400)
+        date_filters = {"date__range": (start_date, end_date)}
+
+    if class_id is not None:
+        try:
+            class_id = int(class_id)
+        except (TypeError, ValueError):
+            raise AttendanceError("classId must be a number.", 400)
+        if not AcademicClass.objects.filter(pk=class_id).exists():
+            raise AttendanceError("Class not found.", 404)
+
+    records_query = Attendance.objects.filter(student=student, **date_filters)
+    if class_id is not None:
+        records_query = records_query.filter(academic_class_id=class_id)
+    records = list(records_query.order_by("-date"))
     counts = {status: 0 for status in VALID_STATUSES}
     for record in records:
         counts[record.status] += 1
@@ -243,7 +325,9 @@ def _format_attendance_totals(total_records, present, absent, late, excused):
     }
 
 
-def get_attendance_summaries(start_date_value, end_date_value):
+def get_attendance_summaries(
+    start_date_value, end_date_value, class_id=None, student_id=None
+):
     """Summarize attendance by section (class) and academic class (grade)."""
     start_date = parse_date(start_date_value)
     end_date = parse_date(end_date_value)
@@ -251,6 +335,28 @@ def get_attendance_summaries(start_date_value, end_date_value):
         raise AttendanceError("Start date must be on or before end date.", 400)
 
     records = Attendance.objects.filter(date__range=(start_date, end_date))
+    selected_class = None
+    selected_student = None
+    if class_id is not None:
+        try:
+            class_id = int(class_id)
+        except (TypeError, ValueError):
+            raise AttendanceError("classId must be a number.", 400)
+        selected_class = AcademicClass.objects.filter(pk=class_id).first()
+        if selected_class is None:
+            raise AttendanceError("Class not found.", 404)
+        records = records.filter(academic_class_id=class_id)
+    if student_id is not None:
+        try:
+            student_id = int(student_id)
+        except (TypeError, ValueError):
+            raise AttendanceError("studentId must be a number.", 400)
+        selected_student = Student.objects.select_related("section__academic_class").filter(
+            pk=student_id
+        ).first()
+        if selected_student is None:
+            raise AttendanceError("Student not found.", 404)
+        records = records.filter(student_id=student_id)
     section_totals = {
         row["student__section_id"]: _format_attendance_totals(
             row["totalRecords"],
@@ -290,6 +396,11 @@ def get_attendance_summaries(start_date_value, end_date_value):
         )
     }
 
+    sections = Section.objects.select_related("academic_class")
+    if selected_class is not None:
+        sections = sections.filter(academic_class_id=selected_class.pk)
+    elif selected_student is not None and selected_student.section_id:
+        sections = sections.filter(academic_class_id=selected_student.section.academic_class_id)
     classes = [
         {
             "className": str(section),
@@ -298,8 +409,15 @@ def get_attendance_summaries(start_date_value, end_date_value):
                 _format_attendance_totals(0, 0, 0, 0, 0),
             ),
         }
-        for section in Section.objects.select_related("academic_class")
+        for section in sections
     ]
+    academic_classes = AcademicClass.objects.all()
+    if selected_class is not None:
+        academic_classes = academic_classes.filter(pk=selected_class.pk)
+    elif selected_student is not None and selected_student.section_id:
+        academic_classes = academic_classes.filter(
+            pk=selected_student.section.academic_class_id
+        )
     grades = [
         {
             "gradeName": academic_class.name,
@@ -308,7 +426,7 @@ def get_attendance_summaries(start_date_value, end_date_value):
                 _format_attendance_totals(0, 0, 0, 0, 0),
             ),
         }
-        for academic_class in AcademicClass.objects.all()
+        for academic_class in academic_classes
     ]
     return {
         "startDate": start_date.isoformat(),

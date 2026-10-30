@@ -192,3 +192,43 @@ AUTH_USER_MODEL = "accounts.User"
 
 SESSION_COOKIE_AGE = 15 * 60
 SESSION_SAVE_EVERY_REQUEST = True
+
+# Application diagnostics are written to the console by default. Deployments
+# may opt into a rotating file by setting SAMS_LOG_FILE to an operator-owned
+# path outside the repository.
+LOG_LEVEL = os.environ.get("SAMS_LOG_LEVEL", "INFO").upper()
+LOG_FILE = os.environ.get("SAMS_LOG_FILE")
+LOGGING_HANDLERS = {
+    "console": {
+        "class": "logging.StreamHandler",
+        "formatter": "standard",
+    },
+}
+if LOG_FILE:
+    LOGGING_HANDLERS["file"] = {
+        "class": "logging.handlers.RotatingFileHandler",
+        "filename": LOG_FILE,
+        "maxBytes": 10 * 1024 * 1024,
+        "backupCount": 5,
+        "encoding": "utf-8",
+        "formatter": "standard",
+    }
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "standard": {
+            "format": "{asctime} {levelname} {name} {message}",
+            "style": "{",
+        },
+    },
+    "handlers": LOGGING_HANDLERS,
+    "loggers": {
+        "sams": {
+            "handlers": ["console"] + (["file"] if LOG_FILE else []),
+            "level": LOG_LEVEL,
+            "propagate": False,
+        },
+    },
+}

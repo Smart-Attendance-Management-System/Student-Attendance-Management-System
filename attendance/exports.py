@@ -6,21 +6,6 @@ from pathlib import Path
 from django.http import HttpResponse
 from openpyxl import Workbook
 from openpyxl.styles import Font
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4, landscape
-from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.lib.units import mm
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.pdfmetrics import registerFontFamily
-from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.platypus import (
-    Paragraph,
-    SimpleDocTemplate,
-    Spacer,
-    Table,
-    TableStyle,
-)
-from xml.sax.saxutils import escape
 
 
 def _safe_sheet_name(name):
@@ -78,6 +63,10 @@ def _excel_response(title, metadata, tables, filename):
 
 
 def _register_pdf_fonts():
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.pdfmetrics import registerFontFamily
+    from reportlab.pdfbase.ttfonts import TTFont
+
     if "SAMS-Vera" in pdfmetrics.getRegisteredFontNames():
         return
     from reportlab import __file__ as reportlab_path
@@ -95,6 +84,13 @@ def _register_pdf_fonts():
 
 
 def _pdf_response(title, metadata, tables, filename):
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+    from reportlab.lib.units import mm
+    from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+    from xml.sax.saxutils import escape
+
     _register_pdf_fonts()
     output = BytesIO()
     page_size = landscape(A4) if any(len(headers) > 5 for _, headers, _ in tables) else A4

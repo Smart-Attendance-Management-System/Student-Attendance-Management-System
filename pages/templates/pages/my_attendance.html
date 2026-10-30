@@ -17,6 +17,14 @@
         {% endfor %}
       </select>
     </div>
+    <div class="col-12 col-md-3">
+      <label for="startDate" class="form-label">From (optional)</label>
+      <input type="date" id="startDate" class="form-control">
+    </div>
+    <div class="col-12 col-md-3">
+      <label for="endDate" class="form-label">To (optional)</label>
+      <input type="date" id="endDate" class="form-control">
+    </div>
   </div>
 
   <div class="d-flex gap-2 mb-3">
@@ -115,6 +123,10 @@
         return;
       }
       const query = new URLSearchParams({ studentId: visibleStudentId });
+      const startDate = document.getElementById("startDate").value;
+      const endDate = document.getElementById("endDate").value;
+      if (startDate) query.set("startDate", startDate);
+      if (endDate) query.set("endDate", endDate);
       try {
         const response = await fetch(
           "/api/attendance/reports/student/" + format + "?" + query,
@@ -148,8 +160,17 @@
       exportButtons.forEach(button => { button.disabled = true; });
       result.replaceChildren(alertBox("light", "Loading..."));
       try {
-        const response = await fetch("/api/attendance/student/" + encodeURIComponent(select.value),
-                                     { headers: { "Accept": "application/json" } });
+        const query = new URLSearchParams();
+        const startDate = document.getElementById("startDate").value;
+        const endDate = document.getElementById("endDate").value;
+        if (startDate) query.set("startDate", startDate);
+        if (endDate) query.set("endDate", endDate);
+        const queryString = query.toString();
+        const response = await fetch(
+          "/api/attendance/student/" + encodeURIComponent(select.value) +
+          (queryString ? "?" + queryString : ""),
+          { headers: { "Accept": "application/json" } }
+        );
         const data = await response.json().catch(() => ({}));
         if (response.ok) {
           visibleStudentId = select.value;
@@ -164,6 +185,8 @@
     }
 
     select.addEventListener("change", load);
+    document.getElementById("startDate").addEventListener("change", load);
+    document.getElementById("endDate").addEventListener("change", load);
     load();
   </script>
 {% endif %}

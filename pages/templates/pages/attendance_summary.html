@@ -13,6 +13,24 @@
     <label for="endDate" class="form-label">To</label>
     <input type="date" id="endDate" class="form-control" value="{{ today|date:'Y-m-d' }}">
   </div>
+  <div class="col-12 col-md-3">
+    <label for="classSelect" class="form-label">Class (optional)</label>
+    <select id="classSelect" class="form-select">
+      <option value="">All classes</option>
+      {% for academic_class in classes %}
+        <option value="{{ academic_class.pk }}">{{ academic_class.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-12 col-md-3">
+    <label for="studentSelect" class="form-label">Student (optional)</label>
+    <select id="studentSelect" class="form-select">
+      <option value="">All students</option>
+      {% for student in students %}
+        <option value="{{ student.pk }}">{{ student.name }} ({{ student.roll_number }})</option>
+      {% endfor %}
+    </select>
+  </div>
   <div class="col-12 col-md-auto">
     <button type="button" id="viewBtn" class="btn btn-primary">View summary</button>
   </div>
@@ -148,6 +166,8 @@
   document.getElementById("viewBtn").addEventListener("click", async () => {
     const startDate = document.getElementById("startDate").value;
     const endDate = document.getElementById("endDate").value;
+    const classId = document.getElementById("classSelect").value;
+    const studentId = document.getElementById("studentSelect").value;
     visiblePeriod = null;
     exportButtons.forEach(button => { button.disabled = true; });
     if (!startDate || !endDate) {
@@ -160,6 +180,8 @@
     }
 
     const query = new URLSearchParams({ startDate, endDate });
+    if (classId) query.set("classId", classId);
+    if (studentId) query.set("studentId", studentId);
     try {
       const response = await fetch("/api/attendance/summary?" + query, {
         headers: { "Accept": "application/json" }
@@ -169,7 +191,7 @@
         showMessage("danger", data.message || "Could not load attendance summary.");
         return;
       }
-      visiblePeriod = { startDate, endDate };
+      visiblePeriod = Object.fromEntries(query.entries());
       exportButtons.forEach(button => { button.disabled = false; });
       render(data);
     } catch (error) {
