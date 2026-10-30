@@ -19,12 +19,18 @@
     </div>
   </div>
 
+  <div class="d-flex gap-2 mb-3">
+    <button type="button" class="btn btn-outline-secondary" data-export="pdf" disabled>Download PDF</button>
+    <button type="button" class="btn btn-outline-secondary" data-export="excel" disabled>Download Excel</button>
+  </div>
   <div id="result"></div>
 
   <script>
     const BADGE = { Present: "success", Absent: "danger", Late: "warning", Excused: "info" };
     const select = document.getElementById("studentSelect");
     const result = document.getElementById("result");
+    let visibleStudentId = null;
+    const exportButtons = document.querySelectorAll("[data-export]");
 
     function alertBox(kind, text) {
       const div = document.createElement("div");
@@ -103,13 +109,51 @@
       result.appendChild(wrapper);
     }
 
+    async function downloadReport(format) {
+      if (!visibleStudentId) {
+        result.replaceChildren(alertBox("warning", "Wait for the student report to load before exporting."));
+        return;
+      }
+      const query = new URLSearchParams({ studentId: visibleStudentId });
+      try {
+        const response = await fetch(
+          "/api/attendance/reports/student/" + format + "?" + query,
+          { headers: { "Accept": "application/octet-stream" } }
+        );
+        if (!response.ok) {
+          const data = await response.json();
+          result.replaceChildren(alertBox("danger", data.message || "Could not export attendance."));
+          return;
+        }
+        const blob = await response.blob();
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        const disposition = response.headers.get("Content-Disposition") || "";
+        const filename = disposition.match(/filename="([^"]+)"/);
+        link.download = filename ? filename[1] : "student-attendance." +
+          (format === "excel" ? "xlsx" : "pdf");
+        link.click();
+        window.setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+      } catch (error) {
+        result.replaceChildren(alertBox("danger", "Could not reach the server."));
+      }
+    }
+
+    document.querySelectorAll("[data-export]").forEach(button => {
+      button.addEventListener("click", () => downloadReport(button.dataset.export));
+    });
+
     async function load() {
+      visibleStudentId = null;
+      exportButtons.forEach(button => { button.disabled = true; });
       result.replaceChildren(alertBox("light", "Loading..."));
       try {
         const response = await fetch("/api/attendance/student/" + encodeURIComponent(select.value),
                                      { headers: { "Accept": "application/json" } });
         const data = await response.json().catch(() => ({}));
         if (response.ok) {
+          visibleStudentId = select.value;
+          exportButtons.forEach(button => { button.disabled = false; });
           render(data);
         } else {
           result.replaceChildren(alertBox("danger", data.message || "Could not load attendance."));

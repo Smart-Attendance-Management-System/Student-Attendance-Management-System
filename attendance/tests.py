@@ -1,7 +1,9 @@
 import datetime
 import json
 import time
+from io import BytesIO
 
+from openpyxl import load_workbook
 from unittest.mock import patch
 from django.db import IntegrityError, connection
 from django.test import TestCase
@@ -613,6 +615,138 @@ class AttendanceSummaryApiTests(AttendanceTestBase):
                     ).status_code,
                     403,
                 )
+
+
+class AttendanceReportExportTests(AttendanceTestBase):
+    base_url = "/api/attendance/reports"
+
+    def export(self, report, file_format, **params):
+        return self.client.get(
+            f"{self.base_url}/{report}/{file_format}",
+            params,
+        )
+
+    def test_summary_excel_contains_displayed_class_and_grade_rows(self):
+        services.mark_attendance(
+            self.teacher,
+            self.cls.pk,
+            TODAY,
+            [{"studentId": self.students[1].pk, "status": "Absent"}],
+        )
+        self.client.force_login(self.admin)
+        response = self.export(
+            "summary",
+            "excel",
+            startDate=TODAY,
+            endDate=TODAY,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response["Content-Type"],
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        workbook = load_workbook(BytesIO(response.content), data_only=True)
+        class_sheet = workbook["By class"]
+        rows = list(class_sheet.iter_rows(values_only=True))
+        headers = rows[3]
+        self.assertEqual(
+            rows[4],
+            ("Grade 10 - A", 3, 2, 1, 0, 0, "66.7%"),
+        )
+        self.assertEqual(headers[0], "Class")
+        grade_rows = list(workbook["By grade"].iter_rows(values_only=True))
+        self.assertEqual(grade_rows[4][0:2], ("Grade 10", 3))
+
+    def test_daily_excel_contains_the_records_shown_in_daily_view(self):
+        services.mark_attendance(
+            self.teacher,
+            self.cls.pk,
+            TODAY,
+            [{"studentId": self.students[1].pk, "status": "Absent"}],
+        )
+        self.client.force_login(self.teacher)
+        response = self.export(
+            "daily",
+            "excel",
+            classId=self.cls.pk,
+            date=TODAY,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        worksheet = load_workbook(BytesIO(response.content), data_only=True)["Attendance records"]
+        rows = list(worksheet.iter_rows(values_only=True))
+        header_index = rows.index(("Roll no.", "Name", "Status", "Remarks"))
+        self.assertEqual(
+            [row[:3] for row in rows[header_index + 1:header_index + 4]],
+            [(1, "Student 1", "Present"), (2, "Student 2", "Absent"), (3, "Student 3", "Present")],
+        )
+
+    def test_student_excel_exports_empty_history_with_headers(self):
+        self.client.force_login(self.admin)
+        response = self.export("student", "excel", studentId=self.students[0].pk)
+
+        self.assertEqual(response.status_code, 200)
+        rows = list(
+            load_workbook(BytesIO(response.content), data_only=True)
+            ["Attendance history"]
+            .iter_rows(values_only=True)
+        )
+        header_index = rows.index(("Date", "Status", "Remarks"))
+        self.assertEqual(rows[header_index + 1][0], "No records for this report.")
+
+    def test_pdf_exports_are_valid_and_empty_daily_report_is_downloadable(self):
+        self.client.force_login(self.teacher)
+        response = self.export("daily", "pdf", classId=self.cls.pk, date=TODAY)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        self.assertTrue(response.content.startswith(b"%PDF-"))
+        self.assertIn('filename="attendance-daily.pdf"', response["Content-Disposition"])
+
+    def test_summary_and_student_reports_can_be_exported_as_pdf(self):
+        parent = User.objects.create_user(
+            username="export-parent",
+            password="test-password",
+            role=User.Role.STUDENT_PARENT,
+        )
+        self.students[0].parent = parent
+        self.students[0].save()
+        services.mark_attendance(self.teacher, self.cls.pk, TODAY, [])
+
+        self.client.force_login(self.admin)
+        summary = self.export(
+            "summary", "pdf", startDate=TODAY, endDate=TODAY
+        )
+        self.assertEqual(summary.status_code, 200)
+        self.assertEqual(summary["Content-Type"], "application/pdf")
+        self.assertTrue(summary.content.startswith(b"%PDF-"))
+
+        self.client.force_login(parent)
+        history = self.export("student", "pdf", studentId=self.students[0].pk)
+        self.assertEqual(history.status_code, 200)
+        self.assertEqual(history["Content-Type"], "application/pdf")
+        self.assertTrue(history.content.startswith(b"%PDF-"))
+
+    def test_role_restrictions_are_preserved_for_exports(self):
+        self.client.force_login(self.teacher)
+        summary = self.export(
+            "summary", "excel", startDate=TODAY, endDate=TODAY
+        )
+        self.assertEqual(summary.status_code, 403)
+
+        parent = User.objects.create_user(
+            username="export-parent",
+            password="test-password",
+            role=User.Role.STUDENT_PARENT,
+        )
+        self.client.force_login(parent)
+        daily = self.export("daily", "pdf", classId=self.cls.pk, date=TODAY)
+        self.assertEqual(daily.status_code, 403)
+
+    def test_unsupported_format_and_unknown_report_are_reported(self):
+        self.client.force_login(self.admin)
+        self.assertEqual(self.export("summary", "csv").status_code, 400)
+        self.assertEqual(self.export("unknown", "pdf").status_code, 404)
 
 
 class StudentHistoryApiTests(AttendanceTestBase):

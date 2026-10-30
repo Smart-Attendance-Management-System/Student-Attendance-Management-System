@@ -16,12 +16,20 @@
   <div class="col-12 col-md-auto">
     <button type="button" id="viewBtn" class="btn btn-primary">View summary</button>
   </div>
+  <div class="col-12 col-md-auto">
+    <button type="button" class="btn btn-outline-secondary" data-export="pdf" disabled>Download PDF</button>
+  </div>
+  <div class="col-12 col-md-auto">
+    <button type="button" class="btn btn-outline-secondary" data-export="excel" disabled>Download Excel</button>
+  </div>
 </div>
 
 <div id="result" aria-live="polite"></div>
 
 <script>
   const result = document.getElementById("result");
+  let visiblePeriod = null;
+  const exportButtons = document.querySelectorAll("[data-export]");
 
   function makeAlert(kind, text) {
     const alert = document.createElement("div");
@@ -102,9 +110,46 @@
     result.appendChild(renderTable("By grade", data.grades, "gradeName"));
   }
 
+  async function downloadReport(format) {
+    if (!visiblePeriod) {
+      showMessage("warning", "View a report before exporting.");
+      return;
+    }
+
+    const query = new URLSearchParams(visiblePeriod);
+    try {
+      const response = await fetch(
+        "/api/attendance/reports/summary/" + format + "?" + query,
+        { headers: { "Accept": "application/octet-stream" } }
+      );
+      if (!response.ok) {
+        const data = await response.json();
+        showMessage("danger", data.message || "Could not export attendance summary.");
+        return;
+      }
+      const blob = await response.blob();
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      const disposition = response.headers.get("Content-Disposition") || "";
+      const filename = disposition.match(/filename="([^"]+)"/);
+      link.download = filename ? filename[1] : "attendance-summary." +
+        (format === "excel" ? "xlsx" : "pdf");
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    } catch (error) {
+      showMessage("danger", "Could not reach the server.");
+    }
+  }
+
+  document.querySelectorAll("[data-export]").forEach(button => {
+    button.addEventListener("click", () => downloadReport(button.dataset.export));
+  });
+
   document.getElementById("viewBtn").addEventListener("click", async () => {
     const startDate = document.getElementById("startDate").value;
     const endDate = document.getElementById("endDate").value;
+    visiblePeriod = null;
+    exportButtons.forEach(button => { button.disabled = true; });
     if (!startDate || !endDate) {
       showMessage("warning", "Please choose both dates.");
       return;
@@ -124,6 +169,8 @@
         showMessage("danger", data.message || "Could not load attendance summary.");
         return;
       }
+      visiblePeriod = { startDate, endDate };
+      exportButtons.forEach(button => { button.disabled = false; });
       render(data);
     } catch (error) {
       showMessage("danger", "Could not reach the server.");
