@@ -64,6 +64,27 @@ $env:USE_SQLITE="1"
 python manage.py test accounts.tests.RolePermissionTests students.tests.StudentProfileTests.test_teacher_receives_403_from_admin_only_endpoint
 ```
 
+## Student data protection (TC-10)
+
+New passwords are stored using Django's BCrypt-SHA256 hasher. Existing PBKDF2
+passwords remain verifiable and are upgraded to bcrypt after a successful
+login. Student history access reuses `attendance.services.can_view_student`,
+so parents can only access children linked to their account; the integration
+test verifies a request for another parent's student returns HTTP 403.
+
+For deployment, terminate HTTPS at the application server or a trusted
+reverse proxy and configure:
+
+- `DJANGO_DEBUG=0`
+- `DJANGO_SECRET_KEY` to a unique secret held outside the repository
+- `DJANGO_ALLOWED_HOSTS` to a comma-separated list of deployment hostnames
+- `TRUST_X_FORWARDED_PROTO=1` only when a trusted proxy sets/replaces the
+  `X-Forwarded-Proto` header to `https`
+
+With `DJANGO_DEBUG=0`, HTTPS redirects, secure session/CSRF cookies, and
+one-year HSTS are enabled by default. Local development keeps these settings
+off unless explicitly enabled.
+
 ## User account management
 
 Admins can manage accounts at `/accounts/users/`: create accounts with a

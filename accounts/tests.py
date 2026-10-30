@@ -1,6 +1,7 @@
 import json
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import AnonymousUser
 from django.test import Client, RequestFactory, TestCase
 from django.urls import reverse
@@ -23,6 +24,7 @@ class UserModelTests(TestCase):
     def test_password_is_hashed(self):
         user = User.objects.create_user(username="a1", password="pass12345")
         self.assertNotEqual(user.password, "pass12345")
+        self.assertTrue(user.password.startswith("bcrypt_sha256$$2b$"))
         self.assertTrue(user.check_password("pass12345"))
 
 
@@ -50,6 +52,16 @@ class LoginAPITests(TestCase):
             response.json()["session_token"], self.client.session.session_key
         )
         self.assertEqual(str(self.client.session["_auth_user_id"]), str(self.user.pk))
+
+    def test_successful_login_upgrades_legacy_password_hash_to_bcrypt(self):
+        self.user.password = make_password("pass12345", hasher="pbkdf2_sha256")
+        self.user.save(update_fields=["password"])
+
+        response = self.post_login("teacher1", "pass12345")
+
+        self.assertEqual(response.status_code, 200)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.password.startswith("bcrypt_sha256$$2b$"))
 
     def test_wrong_password_returns_401(self):
         response = self.post_login("teacher1", "wrong-password")
