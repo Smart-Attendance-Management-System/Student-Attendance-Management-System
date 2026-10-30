@@ -3,10 +3,11 @@
 import datetime
 
 from django.db import IntegrityError, transaction
+from django.db.models import Count, Q
 
 from accounts.models import User
 from notifications.services import log_attendance_edit
-from students.models import AcademicClass, Student
+from students.models import AcademicClass, Section, Student
 
 from .models import Attendance
 
@@ -225,4 +226,93 @@ def get_student_history(user, student_id):
             {"date": r.date.isoformat(), "status": r.status, "remarks": r.remarks}
             for r in records
         ],
+    }
+
+
+def _format_attendance_totals(total_records, present, absent, late, excused):
+    attended = present + late
+    return {
+        "totalRecords": total_records,
+        "present": present,
+        "absent": absent,
+        "late": late,
+        "excused": excused,
+        "averagePercentage": round(attended * 100 / total_records, 1)
+        if total_records
+        else 0.0,
+    }
+
+
+def get_attendance_summaries(start_date_value, end_date_value):
+    """Summarize attendance by section (class) and academic class (grade)."""
+    start_date = parse_date(start_date_value)
+    end_date = parse_date(end_date_value)
+    if start_date > end_date:
+        raise AttendanceError("Start date must be on or before end date.", 400)
+
+    records = Attendance.objects.filter(date__range=(start_date, end_date))
+    section_totals = {
+        row["student__section_id"]: _format_attendance_totals(
+            row["totalRecords"],
+            row["present"],
+            row["absent"],
+            row["late"],
+            row["excused"],
+        )
+        for row in records.values(
+            "student__section_id",
+            "student__section__name",
+            "student__section__academic_class_id",
+            "student__section__academic_class__name",
+        )
+        .annotate(
+            totalRecords=Count("pk"),
+            present=Count("pk", filter=Q(status=Attendance.Status.PRESENT)),
+            absent=Count("pk", filter=Q(status=Attendance.Status.ABSENT)),
+            late=Count("pk", filter=Q(status=Attendance.Status.LATE)),
+            excused=Count("pk", filter=Q(status=Attendance.Status.EXCUSED)),
+        )
+    }
+    grade_totals = {
+        row["academic_class_id"]: _format_attendance_totals(
+            row["totalRecords"],
+            row["present"],
+            row["absent"],
+            row["late"],
+            row["excused"],
+        )
+        for row in records.values("academic_class_id").annotate(
+            totalRecords=Count("pk"),
+            present=Count("pk", filter=Q(status=Attendance.Status.PRESENT)),
+            absent=Count("pk", filter=Q(status=Attendance.Status.ABSENT)),
+            late=Count("pk", filter=Q(status=Attendance.Status.LATE)),
+            excused=Count("pk", filter=Q(status=Attendance.Status.EXCUSED)),
+        )
+    }
+
+    classes = [
+        {
+            "className": str(section),
+            **section_totals.get(
+                section.pk,
+                _format_attendance_totals(0, 0, 0, 0, 0),
+            ),
+        }
+        for section in Section.objects.select_related("academic_class")
+    ]
+    grades = [
+        {
+            "gradeName": academic_class.name,
+            **grade_totals.get(
+                academic_class.pk,
+                _format_attendance_totals(0, 0, 0, 0, 0),
+            ),
+        }
+        for academic_class in AcademicClass.objects.all()
+    ]
+    return {
+        "startDate": start_date.isoformat(),
+        "endDate": end_date.isoformat(),
+        "classes": classes,
+        "grades": grades,
     }

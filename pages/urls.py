@@ -8,6 +8,7 @@ urlpatterns = [
     path("pages/students/", views.student_list, name="student_list"),
     path("pages/attendance/", views.mark_attendance, name="mark_attendance"),
     path("pages/daily/", views.daily_attendance, name="daily_attendance"),
+    path("pages/attendance-summary/", views.attendance_summary, name="attendance_summary"),
     path("pages/my-attendance/", views.my_attendance, name="my_attendance"),
     path("accounts/logout/", auth_views.LogoutView.as_view(next_page="login"), name="logout"),
 ]

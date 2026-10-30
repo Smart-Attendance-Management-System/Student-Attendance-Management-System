@@ -152,6 +152,39 @@ class DailyPageAndNavigationTests(TestCase):
         response = self.client.get(reverse("login"))
         self.assertContains(response, reverse("admin:index"))
 
+
+class AttendanceSummaryPageTests(TestCase):
+    def make_user(self, role):
+        return User.objects.create_user(
+            username=role.lower(), password="test-password", role=role
+        )
+
+    def test_admin_can_open_summary_page(self):
+        self.client.force_login(self.make_user(User.Role.ADMIN))
+        response = self.client.get(reverse("pages:attendance_summary"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Attendance summaries")
+        self.assertContains(response, 'id="startDate"')
+        self.assertContains(response, 'id="endDate"')
+
+    def test_non_admin_users_cannot_open_summary_page(self):
+        for role in (User.Role.TEACHER, User.Role.STUDENT_PARENT):
+            with self.subTest(role=role):
+                self.client.force_login(self.make_user(role))
+                response = self.client.get(reverse("pages:attendance_summary"))
+                self.assertRedirects(
+                    response,
+                    reverse("pages:home"),
+                    fetch_redirect_response=False,
+                )
+
+    def test_admin_navigation_link_is_not_shown_to_teacher(self):
+        teacher = self.make_user(User.Role.TEACHER)
+        self.client.force_login(teacher)
+        response = self.client.get(reverse("pages:mark_attendance"))
+        self.assertNotContains(response, "Attendance summaries")
+
+
 class MyAttendancePageTests(TestCase):
     def make_parent(self, username="parent1"):
         return User.objects.create_user(

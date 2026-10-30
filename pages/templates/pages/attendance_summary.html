@@ -1,0 +1,133 @@
+{% extends "pages/base.html" %}
+{% block title %}Attendance summaries - SAMS{% endblock %}
+{% block content %}
+<h1 class="h3 mb-3">Attendance summaries</h1>
+<p class="text-muted">Attendance totals and average attendance percentage by class and grade.</p>
+
+<div class="row g-2 mb-4 align-items-end">
+  <div class="col-12 col-md-3">
+    <label for="startDate" class="form-label">From</label>
+    <input type="date" id="startDate" class="form-control" value="{{ month_ago|date:'Y-m-d' }}">
+  </div>
+  <div class="col-12 col-md-3">
+    <label for="endDate" class="form-label">To</label>
+    <input type="date" id="endDate" class="form-control" value="{{ today|date:'Y-m-d' }}">
+  </div>
+  <div class="col-12 col-md-auto">
+    <button type="button" id="viewBtn" class="btn btn-primary">View summary</button>
+  </div>
+</div>
+
+<div id="result" aria-live="polite"></div>
+
+<script>
+  const result = document.getElementById("result");
+
+  function makeAlert(kind, text) {
+    const alert = document.createElement("div");
+    alert.className = "alert alert-" + kind;
+    alert.textContent = text;
+    return alert;
+  }
+
+  function showMessage(kind, text) {
+    result.replaceChildren(makeAlert(kind, text));
+  }
+
+  function addCell(row, value) {
+    const cell = document.createElement("td");
+    cell.textContent = value;
+    row.appendChild(cell);
+  }
+
+  function renderTable(title, rows, nameKey) {
+    const section = document.createElement("section");
+    section.className = "mb-4";
+    const heading = document.createElement("h2");
+    heading.className = "h5";
+    heading.textContent = title;
+    section.appendChild(heading);
+
+    if (!rows.length) {
+      const empty = document.createElement("p");
+      empty.className = "text-muted";
+      empty.textContent = "No classes or grades are configured.";
+      section.appendChild(empty);
+      return section;
+    }
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "table-responsive";
+    const table = document.createElement("table");
+    table.className = "table bg-white align-middle";
+    const head = table.createTHead().insertRow();
+    ["Name", "Total", "Present", "Absent", "Late", "Excused", "Average attendance"].forEach(label => {
+      const cell = document.createElement("th");
+      cell.scope = "col";
+      cell.textContent = label;
+      head.appendChild(cell);
+    });
+
+    const body = table.createTBody();
+    rows.forEach(item => {
+      const row = body.insertRow();
+      addCell(row, item[nameKey]);
+      addCell(row, item.totalRecords);
+      addCell(row, item.present);
+      addCell(row, item.absent);
+      addCell(row, item.late);
+      addCell(row, item.excused);
+      addCell(row, item.averagePercentage + "%");
+    });
+    wrapper.appendChild(table);
+    section.appendChild(wrapper);
+    return section;
+  }
+
+  function render(data) {
+    result.replaceChildren();
+    const period = document.createElement("p");
+    period.className = "text-muted";
+    period.textContent = "Period: " + data.startDate + " to " + data.endDate;
+    result.appendChild(period);
+    if (![...data.classes, ...data.grades].some(item => item.totalRecords > 0)) {
+      result.appendChild(
+        makeAlert(
+          "secondary",
+          "No attendance records were found for this period. Totals and percentages are zero."
+        )
+      );
+    }
+    result.appendChild(renderTable("By class", data.classes, "className"));
+    result.appendChild(renderTable("By grade", data.grades, "gradeName"));
+  }
+
+  document.getElementById("viewBtn").addEventListener("click", async () => {
+    const startDate = document.getElementById("startDate").value;
+    const endDate = document.getElementById("endDate").value;
+    if (!startDate || !endDate) {
+      showMessage("warning", "Please choose both dates.");
+      return;
+    }
+    if (startDate > endDate) {
+      showMessage("warning", "The start date must be on or before the end date.");
+      return;
+    }
+
+    const query = new URLSearchParams({ startDate, endDate });
+    try {
+      const response = await fetch("/api/attendance/summary?" + query, {
+        headers: { "Accept": "application/json" }
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        showMessage("danger", data.message || "Could not load attendance summary.");
+        return;
+      }
+      render(data);
+    } catch (error) {
+      showMessage("danger", "Could not reach the server.");
+    }
+  });
+</script>
+{% endblock %}

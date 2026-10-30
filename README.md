@@ -99,6 +99,18 @@ with their physical file row number (the header is row 1), while valid rows
 from the same file are saved. Structural file errors, such as missing required
 columns or malformed Excel files, reject the upload.
 
+## Attendance summaries
+
+Admins can review attendance totals and average percentages by class section
+and academic grade at `/pages/attendance-summary/`. Select an inclusive start
+and end date. Percentages count both Present and Late records as attended;
+unmarked days are not included. Classes and grades with no attendance in the
+selected period are shown with zero totals.
+
+The admin-only `GET /api/attendance/summary` endpoint accepts `startDate` and
+`endDate` in `YYYY-MM-DD` format and returns `classes` and `grades` arrays with
+record totals, status counts, and `averagePercentage`.
+
 ## Academic structure management
 
 Admins can manage academic classes, sections, and subjects under:

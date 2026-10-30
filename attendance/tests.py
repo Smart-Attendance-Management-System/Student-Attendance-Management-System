@@ -505,6 +505,116 @@ class AttendanceSummaryUnitTests(TestCase):
         self.assertEqual(summary["percentage"], 66.7)
 
 
+class AttendanceSummaryApiTests(AttendanceTestBase):
+    """Admin attendance totals grouped by section and academic class."""
+
+    url = "/api/attendance/summary"
+
+    def test_selected_period_returns_class_and_grade_totals(self):
+        extra_section = Section.objects.create(academic_class=self.cls, name="B")
+        extra_student = Student.objects.create(
+            name="Student 4",
+            student_class="Grade 10",
+            roll_number=4,
+            contact_details="parent4@example.com",
+            section=extra_section,
+        )
+        other_grade = AcademicClass.objects.create(name="Grade 9")
+        Section.objects.create(academic_class=other_grade, name="A")
+
+        services.mark_attendance(self.teacher, self.cls.pk, "2026-10-19", [])
+        services.mark_attendance(self.teacher, self.cls.pk, "2026-10-20", [])
+        services.mark_attendance(
+            self.teacher,
+            self.cls.pk,
+            "2026-10-21",
+            [
+                {"studentId": self.students[0].pk, "status": "Absent"},
+                {"studentId": self.students[1].pk, "status": "Late"},
+                {"studentId": self.students[2].pk, "status": "Excused"},
+            ],
+        )
+
+        self.client.force_login(self.admin)
+        response = self.client.get(
+            self.url, {"startDate": "2026-10-20", "endDate": "2026-10-21"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(
+            (body["startDate"], body["endDate"]),
+            ("2026-10-20", "2026-10-21"),
+        )
+        classes = {item["className"]: item for item in body["classes"]}
+        self.assertEqual(
+            classes["Grade 10 - A"],
+            {
+                "className": "Grade 10 - A",
+                "totalRecords": 6,
+                "present": 3,
+                "absent": 1,
+                "late": 1,
+                "excused": 1,
+                "averagePercentage": 66.7,
+            },
+        )
+        self.assertEqual(classes["Grade 10 - B"]["totalRecords"], 2)
+        self.assertEqual(classes["Grade 10 - B"]["averagePercentage"], 100.0)
+        grades = {item["gradeName"]: item for item in body["grades"]}
+        self.assertEqual(
+            grades["Grade 10"],
+            {
+                "gradeName": "Grade 10",
+                "totalRecords": 8,
+                "present": 5,
+                "absent": 1,
+                "late": 1,
+                "excused": 1,
+                "averagePercentage": 75.0,
+            },
+        )
+        self.assertEqual(grades["Grade 9"]["totalRecords"], 0)
+        self.assertEqual(grades["Grade 9"]["averagePercentage"], 0.0)
+
+    def test_period_without_attendance_returns_zero_totals(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(
+            self.url, {"startDate": "2026-10-24", "endDate": "2026-10-25"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertTrue(body["classes"])
+        self.assertTrue(body["grades"])
+        for item in body["classes"] + body["grades"]:
+            self.assertEqual(item["totalRecords"], 0)
+            self.assertEqual(item["averagePercentage"], 0.0)
+
+    def test_invalid_or_reversed_date_range_is_rejected(self):
+        self.client.force_login(self.admin)
+        for params in (
+            {"startDate": "not-a-date", "endDate": "2026-10-25"},
+            {"startDate": "2026-10-26", "endDate": "2026-10-25"},
+        ):
+            with self.subTest(params=params):
+                response = self.client.get(self.url, params)
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(response.json()["status"], "error")
+
+    def test_summary_is_admin_only(self):
+        for user in (self.teacher,):
+            with self.subTest(role=user.role):
+                self.client.force_login(user)
+                self.assertEqual(
+                    self.client.get(
+                        self.url,
+                        {"startDate": "2026-10-20", "endDate": "2026-10-21"},
+                    ).status_code,
+                    403,
+                )
+
+
 class StudentHistoryApiTests(AttendanceTestBase):
     """REQ4.2: a student's history and percentage, visible only to the right people."""
 
