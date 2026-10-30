@@ -1,4 +1,5 @@
 from django.contrib import messages
+import logging
 from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError
 from django.db.models.deletion import ProtectedError
@@ -11,6 +12,8 @@ from accounts.permissions import IsAdmin
 from .bulk_import import BulkImportError, import_students
 from .forms import AcademicClassForm, SectionForm, StudentForm, SubjectForm
 from .models import AcademicClass, Section, Student, Subject
+
+logger = logging.getLogger("sams.students")
 
 
 def _admin_required(view_func):
@@ -37,6 +40,7 @@ def student_create(request):
             except IntegrityError:
                 form.add_error("roll_number", "A student with this roll number already exists.")
             else:
+                logger.info("Student created user_id=%s student_id=%s", request.user.pk, student.pk)
                 messages.success(request, "Student profile created successfully.")
                 return redirect("students:list")
         return render(request, "students/student_form.html", {"form": form, "student": form.instance})
@@ -77,6 +81,7 @@ def student_update(request, pk):
             except IntegrityError:
                 form.add_error("roll_number", "A student with this roll number already exists.")
             else:
+                logger.info("Student updated user_id=%s student_id=%s", request.user.pk, student.pk)
                 messages.success(request, "Student profile updated successfully.")
                 return redirect("students:list")
         return render(request, "students/student_form.html", {"form": form, "student": form.instance})
@@ -94,6 +99,7 @@ def student_update(request, pk):
 def student_delete(request, pk):
     student = get_object_or_404(Student, pk=pk)
     student.delete()
+    logger.info("Student deleted user_id=%s student_id=%s", request.user.pk, pk)
     messages.success(request, "Student profile deleted successfully.")
     return redirect("students:list")
 
@@ -120,6 +126,12 @@ def student_bulk_import(request):
                 status=400,
             )
         if import_result["failures"]:
+            logger.warning(
+                "Student import completed with rejected rows user_id=%s imported_count=%s failure_count=%s",
+                request.user.pk,
+                import_result["imported_count"],
+                len(import_result["failures"]),
+            )
             return render(
                 request,
                 "students/student_import.html",
@@ -128,6 +140,11 @@ def student_bulk_import(request):
         messages.success(
             request,
             f"{import_result['imported_count']} student profiles imported successfully.",
+        )
+        logger.info(
+            "Student import completed user_id=%s imported_count=%s",
+            request.user.pk,
+            import_result["imported_count"],
         )
         return redirect("students:list")
     return render(request, "students/student_import.html")
@@ -145,6 +162,12 @@ def _catalog_views(model, form_class, title, list_name):
             except IntegrityError:
                 form.add_error(None, f"{title} already exists.")
             else:
+                logger.info(
+                    "%s created user_id=%s record_id=%s",
+                    title,
+                    request.user.pk,
+                    form.instance.pk,
+                )
                 messages.success(request, f"{title} created successfully.")
                 return redirect(list_name)
         return render(
@@ -192,6 +215,12 @@ def _catalog_views(model, form_class, title, list_name):
             except IntegrityError:
                 form.add_error(None, f"{title} already exists.")
             else:
+                logger.info(
+                    "%s updated user_id=%s record_id=%s",
+                    title,
+                    request.user.pk,
+                    record.pk,
+                )
                 messages.success(request, f"{title} updated successfully.")
                 return redirect(list_name)
         return render(
@@ -210,6 +239,7 @@ def _catalog_views(model, form_class, title, list_name):
         except ProtectedError:
             messages.error(request, f"{title} cannot be deleted while it is in use.")
         else:
+            logger.info("%s deleted user_id=%s record_id=%s", title, request.user.pk, pk)
             messages.success(request, f"{title} deleted successfully.")
         return redirect(list_name)
 

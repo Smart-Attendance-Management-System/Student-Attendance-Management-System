@@ -1,6 +1,7 @@
 """Business rules for marking and editing attendance."""
 
 import datetime
+import logging
 
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Q
@@ -12,6 +13,7 @@ from students.models import AcademicClass, Section, Student
 from .models import Attendance
 
 VALID_STATUSES = [choice for choice, _ in Attendance.Status.choices]
+logger = logging.getLogger("sams.attendance")
 
 
 class AttendanceError(Exception):
@@ -55,16 +57,28 @@ def mark_attendance(teacher, class_id, date_value, records):
     """
     academic_class = AcademicClass.objects.filter(pk=class_id).first()
     if academic_class is None:
+        logger.warning("Attendance submission rejected: class not found class_id=%s", class_id)
         raise AttendanceError("Class not found.", 400)
     if not is_class_teacher(teacher, academic_class):
+        logger.warning(
+            "Attendance submission rejected: unassigned teacher user_id=%s class_id=%s",
+            teacher.pk,
+            academic_class.pk,
+        )
         raise AttendanceError("You are not assigned to this class.", 403)
 
     date = parse_date(date_value)
     if not isinstance(records, list):
+        logger.warning(
+            "Attendance submission rejected: records must be a list user_id=%s class_id=%s",
+            teacher.pk,
+            academic_class.pk,
+        )
         raise AttendanceError("Records must be a list.", 400)
 
     students = {s.pk: s for s in Student.objects.filter(section__academic_class=academic_class)}
     if not students:
+        logger.warning("Attendance submission rejected: class has no students class_id=%s", academic_class.pk)
         raise AttendanceError("This class has no students.", 400)
 
     statuses = {}
@@ -72,12 +86,28 @@ def mark_attendance(teacher, class_id, date_value, records):
         student_id = record.get("studentId") if isinstance(record, dict) else None
         status = record.get("status") if isinstance(record, dict) else None
         if student_id not in students:
+            logger.warning(
+                "Attendance submission rejected: student not in class user_id=%s class_id=%s",
+                teacher.pk,
+                academic_class.pk,
+            )
             raise AttendanceError(f"Student {student_id} is not in this class.", 400)
         if not is_valid_status(status):
+            logger.warning(
+                "Attendance submission rejected: invalid status user_id=%s class_id=%s",
+                teacher.pk,
+                academic_class.pk,
+            )
             raise AttendanceError(f"Invalid status: {status}.", 400)
         statuses[student_id] = (status, (record.get("remarks") or "")[:255])
 
     if attendance_exists(academic_class, date):
+        logger.info(
+            "Attendance submission rejected: already marked user_id=%s class_id=%s date=%s",
+            teacher.pk,
+            academic_class.pk,
+            date,
+        )
         raise AttendanceError("Attendance already marked for this class and date.", 409)
 
     entries = [
@@ -95,14 +125,32 @@ def mark_attendance(teacher, class_id, date_value, records):
         with transaction.atomic():
             Attendance.objects.bulk_create(entries)
     except IntegrityError:
+        logger.exception(
+            "Attendance submission conflicted with an existing record user_id=%s class_id=%s date=%s",
+            teacher.pk,
+            academic_class.pk,
+            date,
+        )
         # Two submissions at the same moment: the database blocks the second one
         raise AttendanceError("Attendance already marked for this class and date.", 409)
+    logger.info(
+        "Attendance submitted user_id=%s class_id=%s date=%s record_count=%s",
+        teacher.pk,
+        academic_class.pk,
+        date,
+        len(entries),
+    )
     return entries
 
 
 def edit_attendance(user, attendance, new_status, remarks=None):
     """Change one student's status and record the change in the audit log."""
     if not is_class_teacher(user, attendance.academic_class):
+        logger.warning(
+            "Attendance edit rejected: unassigned teacher user_id=%s attendance_id=%s",
+            user.pk,
+            attendance.pk,
+        )
         raise AttendanceError("You are not assigned to this class.", 403)
     if not is_valid_status(new_status):
         raise AttendanceError(f"Invalid status: {new_status}.", 400)
@@ -120,6 +168,14 @@ def edit_attendance(user, attendance, new_status, remarks=None):
         new_status,
         class_id=attendance.academic_class_id,
         attendance_date=attendance.date,
+    )
+    logger.info(
+        "Attendance edited user_id=%s attendance_id=%s class_id=%s old_status=%s new_status=%s",
+        user.pk,
+        attendance.pk,
+        attendance.academic_class_id,
+        old_status,
+        new_status,
     )
     return attendance
 

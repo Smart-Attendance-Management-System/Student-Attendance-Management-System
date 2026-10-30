@@ -1,4 +1,5 @@
 import json
+import logging
 
 from django.db import connection
 from django.http import JsonResponse
@@ -13,6 +14,8 @@ from accounts.permissions import IsAdmin, IsStudentParent, IsTeacher
 from . import services
 from .exports import build_report_response
 from .models import Attendance
+
+logger = logging.getLogger("sams.attendance")
 
 
 def _read_json(request):
@@ -39,6 +42,11 @@ def mark_attendance_api(request):
             request.user, data["classId"], data["date"], data.get("records", [])
         )
     except services.AttendanceError as err:
+        logger.warning(
+            "Attendance API request failed user_id=%s status=%s",
+            getattr(request.user, "pk", None),
+            err.status_code,
+        )
         return _error(err)
     return JsonResponse(
         {
