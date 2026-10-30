@@ -96,6 +96,8 @@ def attendance_summary(request):
         {
             "today": today,
             "month_ago": today - timedelta(days=29),
+            "classes": AcademicClass.objects.all(),
+            "students": Student.objects.select_related("section"),
         },
     )
 
