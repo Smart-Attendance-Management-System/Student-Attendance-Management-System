@@ -333,3 +333,21 @@ return HTTP 400 from the API and an error message on the page.
 $env:USE_SQLITE="1"
 python manage.py test notifications.tests.AuditLogViewTests
 ```
+
+## Usability and browser support (NFR4 / TC-12)
+
+All role pages use the shared Bootstrap layout in `pages/base.html`: a
+viewport meta tag, a navigation bar that collapses behind a menu button below
+992px, and tables that scroll inside their own container instead of the page.
+On the Mark attendance page every student starts as Present, so a teacher
+taps once only for each Absent, Late, or Excused student and once to submit.
+On phones the four status buttons are shown as a 2x2 grid of 44px touch
+targets, and the Submit bar stays visible at the bottom while scrolling.
+
+Supported browsers: current Chrome, Firefox, Safari (macOS and iPadOS/iOS),
+and Edge. The manual device and browser checklist is recorded on issue #18.
+
+```powershell
+$env:USE_SQLITE="1"
+python manage.py test pages.tests.UsabilityCompatibilityTests
+```
