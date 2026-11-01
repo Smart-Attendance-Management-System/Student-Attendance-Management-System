@@ -1,3 +1,4 @@
+import datetime
 import logging
 import time
 
@@ -171,3 +172,90 @@ def notify_absences(attendance_records):
         for notification in (notify_absence(record) for record in attendance_records)
         if notification is not None
     ]
+
+
+class AuditLogFilterError(ValueError):
+    """A filter value on the audit log search could not be understood."""
+
+
+def _parse_id(value, name):
+    if value in (None, ""):
+        return None
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        raise AuditLogFilterError(f"{name} must be a number.")
+    if parsed <= 0:
+        raise AuditLogFilterError(f"{name} must be a positive number.")
+    return parsed
+
+
+def _parse_date(value, name):
+    if value in (None, ""):
+        return None
+    try:
+        return datetime.date.fromisoformat(value)
+    except (TypeError, ValueError):
+        raise AuditLogFilterError(f"{name} must be in YYYY-MM-DD format.")
+
+
+def search_audit_log(class_id=None, date=None, user_id=None):
+    """REQ5.3: audit log entries filtered by class, attendance date, and/or editor.
+
+    Filters are optional and combine with AND. `date` matches the date of the
+    attendance record that was changed.
+    """
+    class_id = _parse_id(class_id, "classId")
+    user_id = _parse_id(user_id, "userId")
+    date = _parse_date(date, "date")
+
+    entries = AuditLog.objects.select_related("edited_by")
+    if class_id is not None:
+        entries = entries.filter(class_id=class_id)
+    if date is not None:
+        entries = entries.filter(attendance_date=date)
+    if user_id is not None:
+        entries = entries.filter(edited_by_id=user_id)
+    return entries.order_by("-edited_at", "-pk")
+
+
+def describe_audit_entries(entries):
+    """Attach class and student names to a page of audit entries (2 extra queries)."""
+    from attendance.models import Attendance
+    from students.models import AcademicClass
+
+    entries = list(entries)
+    class_names = {
+        pk: str(c)
+        for pk, c in AcademicClass.objects.in_bulk(
+            {e.class_id for e in entries if e.class_id}
+        ).items()
+    }
+    students = {
+        a.pk: a.student
+        for a in Attendance.objects.select_related("student").filter(
+            pk__in={e.attendance_id for e in entries if e.attendance_id}
+        )
+    }
+    for entry in entries:
+        entry.class_name = class_names.get(entry.class_id, "")
+        student = students.get(entry.attendance_id)
+        entry.student_name = student.name if student else ""
+    return entries
+
+
+def audit_entry_to_dict(entry):
+    return {
+        "id": entry.pk,
+        "editedAt": entry.edited_at.isoformat(),
+        "editedBy": entry.edited_by.username if entry.edited_by else None,
+        "editedById": entry.edited_by_id,
+        "attendanceId": entry.attendance_id,
+        "classId": entry.class_id,
+        "className": getattr(entry, "class_name", ""),
+        "studentName": getattr(entry, "student_name", ""),
+        "attendanceDate": entry.attendance_date.isoformat() if entry.attendance_date else None,
+        "oldStatus": entry.old_status,
+        "newStatus": entry.new_status,
+        "details": entry.details,
+    }

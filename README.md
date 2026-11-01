@@ -312,3 +312,24 @@ pause between attempts can be set with `SAMS_NOTIFICATION_RETRY_DELAY`
 $env:USE_SQLITE="1"
 python manage.py test notifications.tests.NotificationRetryTests
 ```
+
+## Audit log search (REQ5.3)
+
+Admins can search attendance edits at `/audit-log/` (linked as **Audit log**
+in the admin navigation). Filters are optional and combine with AND:
+
+- **Class** (`classId`): the class of the edited record.
+- **Attendance date** (`date`, `YYYY-MM-DD`): the date of the attendance
+  record that was changed.
+- **Edited by** (`userId`): the teacher or admin who made the change.
+
+The same search is available as JSON from the admin-only
+`GET /api/audit-log?classId=3&date=2026-10-27&userId=5` (up to 500 newest
+entries; `count` and `truncated` report the full total). Teachers and
+Student/Parent users receive HTTP 403 from both. Malformed filter values
+return HTTP 400 from the API and an error message on the page.
+
+```powershell
+$env:USE_SQLITE="1"
+python manage.py test notifications.tests.AuditLogViewTests
+```
