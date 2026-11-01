@@ -10,8 +10,8 @@ from accounts.models import User
 from attendance.models import Attendance
 from students.models import AcademicClass, Section, Student
 
-from .models import AuditLog, Notification
-from .services import log_attendance_edit, notify_absence
+from .models import AuditLog, Notification, NotificationAttempt
+from .services import MAX_SEND_ATTEMPTS, log_attendance_edit, notify_absence, send_notification
 
 
 class AuditLogTests(TestCase):
@@ -161,3 +161,99 @@ class NotifyAbsenceUnitTests(AbsenceNotificationTestBase):
             )
             self.assertIsNone(notify_absence(record))
         self.assertFalse(Notification.objects.exists())
+
+
+class FlakyEmail:
+    """Simulated email sender: raises for the first `failures` calls, then succeeds."""
+
+    def __init__(self, failures):
+        self.failures = failures
+        self.calls = 0
+
+    def __call__(self, *args, **kwargs):
+        self.calls += 1
+        if self.calls <= self.failures:
+            raise ConnectionError(f"simulated SMTP failure {self.calls}")
+        return 1
+
+
+class NotificationRetryTests(AbsenceNotificationTestBase):
+    """REQ5.4: up to 3 attempts, every failure logged, failed after the last."""
+
+    def make_notification(self):
+        record = Attendance.objects.create(
+            student=self.students[0], academic_class=self.cls,
+            date=ABSENCE_DATE, status="Absent",
+        )
+        return Notification.objects.create(
+            student=self.students[0], attendance=record,
+            recipient_email="parent1@example.com",
+            subject="Absence notice", message="Child 1 was absent.",
+        )
+
+    def test_max_attempts_is_three(self):
+        self.assertEqual(MAX_SEND_ATTEMPTS, 3)
+
+    def test_succeeds_first_time_with_one_attempt(self):
+        fake = FlakyEmail(failures=0)
+        with patch("notifications.services.send_mail", side_effect=fake):
+            notification = send_notification(self.make_notification())
+        self.assertEqual(fake.calls, 1)
+        self.assertEqual(notification.status, Notification.Status.SENT)
+        self.assertEqual(notification.attempts, 1)
+        self.assertFalse(notification.attempt_log.filter(succeeded=False).exists())
+
+    def test_retries_and_succeeds_on_third_attempt(self):
+        fake = FlakyEmail(failures=2)
+        with patch("notifications.services.send_mail", side_effect=fake):
+            notification = send_notification(self.make_notification())
+        self.assertEqual(fake.calls, 3)
+        notification.refresh_from_db()
+        self.assertEqual(notification.status, Notification.Status.SENT)
+        self.assertEqual(notification.attempts, 3)
+        self.assertEqual(
+            list(notification.attempt_log.values_list("attempt_number", "succeeded")),
+            [(1, False), (2, False), (3, True)],
+        )
+        self.assertEqual(notification.last_error, "")
+
+    def test_gives_up_after_three_failures_and_marks_failed(self):
+        fake = FlakyEmail(failures=99)
+        with patch("notifications.services.send_mail", side_effect=fake), \
+                self.assertLogs("sams.notifications", level="WARNING") as logs:
+            notification = send_notification(self.make_notification())
+        self.assertEqual(fake.calls, 3)  # never a 4th attempt
+        notification.refresh_from_db()
+        self.assertEqual(notification.status, Notification.Status.FAILED)
+        self.assertEqual(notification.attempts, 3)
+        self.assertIsNone(notification.sent_at)
+        self.assertIn("simulated SMTP failure 3", notification.last_error)
+
+        failed = NotificationAttempt.objects.filter(notification=notification, succeeded=False)
+        self.assertEqual(list(failed.values_list("attempt_number", flat=True)), [1, 2, 3])
+        self.assertEqual(sum("send failed" in line for line in logs.output), 3)
+        self.assertTrue(any("marked failed after 3 attempts" in line for line in logs.output))
+        # failure logs carry ids only, not the parent's email address
+        self.assertFalse(any("parent1@example.com" in line for line in logs.output))
+
+    def test_status_is_pending_between_attempts(self):
+        seen = []
+        notification = self.make_notification()
+
+        def failing_send(*args, **kwargs):
+            seen.append(Notification.objects.get(pk=notification.pk).status)
+            raise ConnectionError("down")
+
+        with patch("notifications.services.send_mail", side_effect=failing_send):
+            send_notification(notification)
+        self.assertEqual(seen, ["pending", "pending", "pending"])
+        self.assertEqual(Notification.objects.get(pk=notification.pk).status, "failed")
+
+    def test_absence_email_is_retried_through_attendance_api(self):
+        fake = FlakyEmail(failures=1)
+        with patch("notifications.services.send_mail", side_effect=fake):
+            response = self.submit({0: "Absent"})
+        self.assertEqual(response.status_code, 201)
+        notification = Notification.objects.get()
+        self.assertEqual(notification.status, Notification.Status.SENT)
+        self.assertEqual(notification.attempts, 2)

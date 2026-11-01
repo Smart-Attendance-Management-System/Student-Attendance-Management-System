@@ -297,3 +297,18 @@ Run the TC-08 tests with:
 $env:USE_SQLITE="1"
 python manage.py test notifications.tests.AbsenceNotificationIntegrationTests
 ```
+
+### Retrying failed notifications (REQ5.4)
+
+Each notification is tried up to 3 times. Every attempt is stored as a
+`NotificationAttempt` (attempt number, success, error) and each failure is
+written to the `sams.notifications` log with record ids only. While retries
+remain the status stays `pending`; after the third failure it becomes
+`failed`. Both are visible in Django admin under Notifications. An optional
+pause between attempts can be set with `SAMS_NOTIFICATION_RETRY_DELAY`
+(seconds, default 0) in settings.
+
+```powershell
+$env:USE_SQLITE="1"
+python manage.py test notifications.tests.NotificationRetryTests
+```
