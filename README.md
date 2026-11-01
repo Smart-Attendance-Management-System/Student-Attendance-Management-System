@@ -297,3 +297,57 @@ Run the TC-08 tests with:
 $env:USE_SQLITE="1"
 python manage.py test notifications.tests.AbsenceNotificationIntegrationTests
 ```
+
+### Retrying failed notifications (REQ5.4)
+
+Each notification is tried up to 3 times. Every attempt is stored as a
+`NotificationAttempt` (attempt number, success, error) and each failure is
+written to the `sams.notifications` log with record ids only. While retries
+remain the status stays `pending`; after the third failure it becomes
+`failed`. Both are visible in Django admin under Notifications. An optional
+pause between attempts can be set with `SAMS_NOTIFICATION_RETRY_DELAY`
+(seconds, default 0) in settings.
+
+```powershell
+$env:USE_SQLITE="1"
+python manage.py test notifications.tests.NotificationRetryTests
+```
+
+## Audit log search (REQ5.3)
+
+Admins can search attendance edits at `/audit-log/` (linked as **Audit log**
+in the admin navigation). Filters are optional and combine with AND:
+
+- **Class** (`classId`): the class of the edited record.
+- **Attendance date** (`date`, `YYYY-MM-DD`): the date of the attendance
+  record that was changed.
+- **Edited by** (`userId`): the teacher or admin who made the change.
+
+The same search is available as JSON from the admin-only
+`GET /api/audit-log?classId=3&date=2026-10-27&userId=5` (up to 500 newest
+entries; `count` and `truncated` report the full total). Teachers and
+Student/Parent users receive HTTP 403 from both. Malformed filter values
+return HTTP 400 from the API and an error message on the page.
+
+```powershell
+$env:USE_SQLITE="1"
+python manage.py test notifications.tests.AuditLogViewTests
+```
+
+## Usability and browser support (NFR4 / TC-12)
+
+All role pages use the shared Bootstrap layout in `pages/base.html`: a
+viewport meta tag, a navigation bar that collapses behind a menu button below
+992px, and tables that scroll inside their own container instead of the page.
+On the Mark attendance page every student starts as Present, so a teacher
+taps once only for each Absent, Late, or Excused student and once to submit.
+On phones the four status buttons are shown as a 2x2 grid of 44px touch
+targets, and the Submit bar stays visible at the bottom while scrolling.
+
+Supported browsers: current Chrome, Firefox, Safari (macOS and iPadOS/iOS),
+and Edge. The manual device and browser checklist is recorded on issue #18.
+
+```powershell
+$env:USE_SQLITE="1"
+python manage.py test pages.tests.UsabilityCompatibilityTests
+```

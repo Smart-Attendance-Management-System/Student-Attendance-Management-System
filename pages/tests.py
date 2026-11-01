@@ -1,3 +1,4 @@
+import re
 from datetime import timedelta
 from unittest.mock import patch
 
@@ -242,3 +243,94 @@ class MyAttendancePageTests(TestCase):
         response = self.client.get(reverse("pages:my_attendance"))
         self.assertEqual(response.status_code, 302)
         self.assertTrue(response.url.startswith(reverse("login")))
+
+class UsabilityCompatibilityTests(TestCase):
+    """NFR4 / TC-12: automated part of the usability checks.
+
+    The per-browser and per-device results are recorded manually on the
+    issue; these tests stop the markup that makes those checks pass from
+    regressing.
+    """
+
+    def setUp(self):
+        self.teacher = User.objects.create_user(
+            username="teacher1", password="pass12345", role=User.Role.TEACHER
+        )
+        self.admin = User.objects.create_user(
+            username="admin1", password="pass12345", role=User.Role.ADMIN
+        )
+        self.parent = User.objects.create_user(
+            username="parent1", password="pass12345", role=User.Role.STUDENT_PARENT
+        )
+        self.cls = AcademicClass.objects.create(name="Grade 6", class_teacher=self.teacher)
+        section = Section.objects.create(academic_class=self.cls, name="A")
+        self.students = [
+            Student.objects.create(
+                name=f"Pupil {n}", student_class="Grade 6", roll_number=500 + n,
+                contact_details="office", section=section,
+            )
+            for n in range(1, 4)
+        ]
+
+    def pages_for(self, user):
+        return {
+            self.teacher: [
+                reverse("pages:mark_attendance") + f"?class={self.cls.pk}",
+                reverse("pages:daily_attendance"),
+                reverse("pages:student_list"),
+            ],
+            self.admin: [
+                reverse("pages:student_list"),
+                reverse("pages:attendance_summary"),
+                reverse("pages:daily_attendance"),
+                reverse("accounts:list"),
+            ],
+            self.parent: [reverse("pages:my_attendance")],
+        }[user]
+
+    def test_every_role_page_is_mobile_ready(self):
+        for user in (self.teacher, self.admin, self.parent):
+            self.client.force_login(user)
+            for url in self.pages_for(user):
+                with self.subTest(user=user.username, url=url):
+                    response = self.client.get(url)
+                    self.assertEqual(response.status_code, 200)
+                    self.assertContains(response, 'name="viewport" content="width=device-width, initial-scale=1"')
+                    # navigation collapses behind a menu button on narrow screens
+                    self.assertContains(response, 'class="navbar navbar-expand-lg')
+                    self.assertContains(response, 'class="navbar-toggler"')
+                    self.assertContains(response, "bootstrap.bundle.min.js")
+
+    def test_login_page_is_mobile_ready(self):
+        response = self.client.get(reverse("login"))
+        self.assertContains(response, 'name="viewport"')
+
+    def test_marking_needs_at_most_one_tap_per_student(self):
+        self.client.force_login(self.teacher)
+        response = self.client.get(reverse("pages:mark_attendance") + f"?class={self.cls.pk}")
+        html = response.content.decode()
+        for student in self.students:
+            with self.subTest(student=student.name):
+                # Present is pre-selected (0 taps) and every other status is one tap away
+                present_input = re.search(rf'<input[^>]*id="s{student.pk}-Present"[^>]*>', html)
+                self.assertIsNotNone(present_input)
+                self.assertRegex(present_input.group(0), r"\schecked\b")
+                for status in ("Absent", "Late", "Excused"):
+                    self.assertIn(f'for="s{student.pk}-{status}"', html)
+                self.assertEqual(html.count(f'name="status-{student.pk}"'), 4)
+        self.assertContains(response, 'id="markAll"')
+        self.assertContains(response, 'class="submit-bar')
+
+    def test_status_buttons_are_touch_sized(self):
+        self.client.force_login(self.teacher)
+        response = self.client.get(reverse("pages:mark_attendance") + f"?class={self.cls.pk}")
+        self.assertContains(response, "min-height: 44px")
+        self.assertNotContains(response, "btn-outline-primary btn-sm")
+
+    def test_tables_scroll_inside_their_container(self):
+        self.client.force_login(self.teacher)
+        response = self.client.get(reverse("pages:mark_attendance") + f"?class={self.cls.pk}")
+        self.assertContains(response, 'class="table-responsive"')
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse("pages:student_list"))
+        self.assertContains(response, 'class="table-responsive"')
