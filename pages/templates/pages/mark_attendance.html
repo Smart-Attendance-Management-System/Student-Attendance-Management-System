@@ -1,5 +1,16 @@
 {% extends "pages/base.html" %}
 {% block title %}Mark attendance - SAMS{% endblock %}
+{% block extra_head %}
+<style>
+  /* NFR4: one tap per student, with finger-sized targets on phones and tablets */
+  .status-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .25rem; min-width: 11rem; }
+  .status-choices .btn { min-height: 44px; display: flex; align-items: center; justify-content: center; }
+  @media (min-width: 768px) {
+    .status-choices { grid-template-columns: repeat(4, auto); justify-content: start; }
+  }
+  .submit-bar { position: sticky; bottom: 0; z-index: 10; }
+</style>
+{% endblock %}
 {% block content %}
 <h1 class="h3 mb-3">Mark attendance</h1>
 
@@ -28,19 +39,19 @@
 
   <div class="table-responsive">
     <table class="table bg-white align-middle">
-      <thead><tr><th>Roll no.</th><th>Name</th><th>Status</th></tr></thead>
+      <thead><tr><th class="text-nowrap">Roll</th><th>Name</th><th>Status</th></tr></thead>
       <tbody>
         {% for s in students %}
         <tr data-student-id="{{ s.pk }}">
           <td>{{ s.roll_number }}</td>
           <td>{{ s.name }}</td>
           <td>
-            <div class="btn-group" role="group">
+            <div class="status-choices" role="radiogroup" aria-label="Status for {{ s.name }}">
               {% for status in statuses %}
               <input type="radio" class="btn-check" name="status-{{ s.pk }}"
-                     id="s{{ s.pk }}-{{ status }}" value="{{ status }}"
+                     id="s{{ s.pk }}-{{ status }}" value="{{ status }}" autocomplete="off"
                      {% if status == "Present" %}checked{% endif %}>
-              <label class="btn btn-outline-primary btn-sm" for="s{{ s.pk }}-{{ status }}">{{ status }}</label>
+              <label class="btn btn-outline-primary" for="s{{ s.pk }}-{{ status }}">{{ status }}</label>
               {% endfor %}
             </div>
           </td>
@@ -50,16 +61,33 @@
     </table>
   </div>
 
-  <button type="button" id="submitAttendance" class="btn btn-primary">Submit attendance</button>
+  <div class="submit-bar bg-light border-top py-2 d-flex flex-wrap align-items-center gap-2">
+    <button type="button" id="submitAttendance" class="btn btn-primary">Submit attendance</button>
+    <span id="tally" class="small text-muted" aria-live="polite"></span>
+  </div>
   <div id="result" class="mt-3"></div>
 
   <script>
     const csrfToken = "{{ csrf_token }}";
     const classId = {{ selected.pk }};
 
+    function updateTally() {
+      const counts = {};
+      document.querySelectorAll('tr[data-student-id] input[type="radio"]:checked').forEach(r => {
+        counts[r.value] = (counts[r.value] || 0) + 1;
+      });
+      document.getElementById("tally").textContent = Object.keys(counts)
+        .map(status => status + ": " + counts[status]).join(" \u00b7 ");
+    }
+
     document.getElementById("markAll").addEventListener("click", () => {
       document.querySelectorAll('input[type="radio"][value="Present"]').forEach(r => r.checked = true);
+      updateTally();
     });
+    document.querySelectorAll('tr[data-student-id] input[type="radio"]').forEach(r => {
+      r.addEventListener("change", updateTally);
+    });
+    updateTally();
 
     function showResult(kind, text) {
       document.getElementById("result").innerHTML =
