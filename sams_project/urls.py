@@ -64,5 +64,6 @@ urlpatterns = [
     path('sections/', include((sections_urlpatterns, 'sections'), namespace='sections')),
     path('subjects/', include((subjects_urlpatterns, 'subjects'), namespace='subjects')),
     path('', include('attendance.urls')),
+    path('', include('notifications.urls')),
     path('', include(('pages.urls', 'pages'), namespace='pages')),
 ]

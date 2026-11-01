@@ -1,3 +1,4 @@
+import datetime
 import json
 from unittest.mock import patch
 
@@ -257,3 +258,118 @@ class NotificationRetryTests(AbsenceNotificationTestBase):
         notification = Notification.objects.get()
         self.assertEqual(notification.status, Notification.Status.SENT)
         self.assertEqual(notification.attempts, 2)
+
+
+class AuditLogViewTests(TestCase):
+    """REQ5.3: admins search the audit log by class, date, or user; nobody else can."""
+
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            username="admin1", password="pass12345", role=User.Role.ADMIN
+        )
+        self.teacher_a = User.objects.create_user(
+            username="teacherA", password="pass12345", role=User.Role.TEACHER
+        )
+        self.teacher_b = User.objects.create_user(
+            username="teacherB", password="pass12345", role=User.Role.TEACHER
+        )
+        self.parent = User.objects.create_user(
+            username="parent1", password="pass12345", role=User.Role.STUDENT_PARENT
+        )
+        self.class_a = AcademicClass.objects.create(name="Grade 7", class_teacher=self.teacher_a)
+        self.class_b = AcademicClass.objects.create(name="Grade 8", class_teacher=self.teacher_b)
+        self.day1 = datetime.date(2026, 10, 26)
+        self.day2 = datetime.date(2026, 10, 27)
+        # (who, class, date) for four edits covering every filter combination
+        self.e1 = log_attendance_edit(self.teacher_a, 1, "Present", "Absent", self.class_a.pk, self.day1)
+        self.e2 = log_attendance_edit(self.teacher_a, 2, "Absent", "Late", self.class_a.pk, self.day2)
+        self.e3 = log_attendance_edit(self.teacher_b, 3, "Present", "Excused", self.class_b.pk, self.day1)
+        self.e4 = log_attendance_edit(self.admin, 4, "Late", "Present", self.class_b.pk, self.day2)
+        self.page_url = reverse("notifications:audit_log")
+        self.api_url = reverse("notifications:audit_log_api")
+
+    def api_ids(self, **params):
+        self.client.force_login(self.admin)
+        response = self.client.get(self.api_url, params)
+        self.assertEqual(response.status_code, 200)
+        return {row["id"] for row in response.json()["results"]}
+
+    # --- each filter ---------------------------------------------------
+    def test_no_filter_returns_everything(self):
+        self.assertEqual(self.api_ids(), {self.e1.pk, self.e2.pk, self.e3.pk, self.e4.pk})
+
+    def test_filter_by_class(self):
+        self.assertEqual(self.api_ids(classId=self.class_a.pk), {self.e1.pk, self.e2.pk})
+
+    def test_filter_by_date(self):
+        self.assertEqual(self.api_ids(date="2026-10-26"), {self.e1.pk, self.e3.pk})
+
+    def test_filter_by_user(self):
+        self.assertEqual(self.api_ids(userId=self.teacher_b.pk), {self.e3.pk})
+
+    def test_filters_combine(self):
+        self.assertEqual(
+            self.api_ids(classId=self.class_b.pk, date="2026-10-27", userId=self.admin.pk),
+            {self.e4.pk},
+        )
+        self.assertEqual(self.api_ids(classId=self.class_a.pk, userId=self.teacher_b.pk), set())
+
+    def test_api_response_includes_readable_fields(self):
+        self.client.force_login(self.admin)
+        row = self.client.get(self.api_url, {"userId": self.teacher_b.pk}).json()["results"][0]
+        self.assertEqual(row["editedBy"], "teacherB")
+        self.assertEqual(row["className"], "Grade 8")
+        self.assertEqual(row["attendanceDate"], "2026-10-26")
+        self.assertEqual((row["oldStatus"], row["newStatus"]), ("Present", "Excused"))
+
+    def test_page_shows_filtered_rows(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(self.page_url, {"classId": self.class_a.pk})
+        self.assertEqual(response.status_code, 200)
+        shown = {e.pk for e in response.context["page"].object_list}
+        self.assertEqual(shown, {self.e1.pk, self.e2.pk})
+        self.assertContains(response, "Grade 7")
+
+    def test_page_filters_by_date_and_user(self):
+        self.client.force_login(self.admin)
+        by_date = self.client.get(self.page_url, {"date": "2026-10-27"})
+        self.assertEqual({e.pk for e in by_date.context["page"].object_list}, {self.e2.pk, self.e4.pk})
+        by_user = self.client.get(self.page_url, {"userId": self.teacher_a.pk})
+        self.assertEqual({e.pk for e in by_user.context["page"].object_list}, {self.e1.pk, self.e2.pk})
+
+    def test_invalid_filters_are_rejected(self):
+        self.client.force_login(self.admin)
+        self.assertEqual(self.client.get(self.api_url, {"date": "27-10-2026"}).status_code, 400)
+        self.assertEqual(self.client.get(self.api_url, {"classId": "abc"}).status_code, 400)
+        page = self.client.get(self.page_url, {"userId": "abc"})
+        self.assertEqual(page.status_code, 200)
+        self.assertContains(page, "userId must be a number.")
+
+    def test_no_matches_shows_message(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(self.page_url, {"date": "2020-01-01"})
+        self.assertContains(response, "No audit log entries match these filters.")
+
+    # --- edge cases: only admins ------------------------------------------
+    def test_teacher_gets_403_from_page_and_api(self):
+        self.client.force_login(self.teacher_a)
+        self.assertEqual(self.client.get(self.page_url).status_code, 403)
+        self.assertEqual(self.client.get(self.api_url).status_code, 403)
+
+    def test_parent_gets_403_from_page_and_api(self):
+        self.client.force_login(self.parent)
+        self.assertEqual(self.client.get(self.page_url).status_code, 403)
+        self.assertEqual(self.client.get(self.api_url).status_code, 403)
+
+    def test_anonymous_user_is_sent_to_login_or_refused(self):
+        page = self.client.get(self.page_url)
+        self.assertEqual(page.status_code, 302)
+        self.assertIn(reverse("login"), page["Location"])
+        self.assertIn(self.client.get(self.api_url).status_code, (401, 403))
+
+    def test_audit_log_link_only_in_admin_nav(self):
+        self.client.force_login(self.admin)
+        self.assertContains(self.client.get(self.page_url), f'href="{self.page_url}"')
+        self.client.force_login(self.teacher_a)
+        home = self.client.get(reverse("pages:home"))
+        self.assertNotContains(home, f'href="{self.page_url}"')

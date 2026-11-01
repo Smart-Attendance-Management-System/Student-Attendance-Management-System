@@ -26,6 +26,7 @@
       {% endif %}
       {% if user.role == "ADMIN" %}
       <a class="link-light" href="{% url 'accounts:list' %}">Manage Users</a>
+      <a class="link-light" href="{% url 'notifications:audit_log' %}">Audit log</a>
       {% endif %}
       {% if user.is_staff %}
       <a class="link-light" href="{% url 'admin:index' %}">Admin site</a>
