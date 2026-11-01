@@ -1,15 +1,19 @@
 import logging
+import time
 
 from django.conf import settings
 from django.core.mail import send_mail
 from django.utils import timezone
 
-from .models import AuditLog, Notification
+from .models import AuditLog, Notification, NotificationAttempt
 
 logger = logging.getLogger("sams.notifications")
 
 # REQ5.1: only an unexcused absence triggers a parent email.
 NOTIFY_STATUSES = ("Absent",)
+
+# REQ5.4: each notification is tried at most this many times.
+MAX_SEND_ATTEMPTS = 3
 
 
 def log_attendance_edit(user, attendance_id, old_status, new_status,
@@ -48,34 +52,82 @@ def _build_message(attendance):
     return subject, message
 
 
-def send_notification(notification):
-    """Send one notification email and record the outcome on the record."""
-    try:
-        send_mail(
-            notification.subject,
-            notification.message,
-            settings.DEFAULT_FROM_EMAIL,
-            [notification.recipient_email],
-            fail_silently=False,
+def _try_send(notification):
+    send_mail(
+        notification.subject,
+        notification.message,
+        settings.DEFAULT_FROM_EMAIL,
+        [notification.recipient_email],
+        fail_silently=False,
+    )
+
+
+def send_notification(notification, max_attempts=None, retry_delay=None):
+    """Send one notification email, retrying on failure (REQ5.4).
+
+    Each attempt is saved as a NotificationAttempt and failures are written
+    to the application log. After the last failed attempt the notification
+    status is set to failed.
+    """
+    if max_attempts is None:
+        max_attempts = getattr(settings, "SAMS_NOTIFICATION_MAX_ATTEMPTS", MAX_SEND_ATTEMPTS)
+    if retry_delay is None:
+        retry_delay = getattr(settings, "SAMS_NOTIFICATION_RETRY_DELAY", 0)
+
+    while notification.attempts < max_attempts:
+        notification.attempts += 1
+        attempt_number = notification.attempts
+        try:
+            _try_send(notification)
+        except Exception as exc:  # any backend error (SMTP, network, ...)
+            error = f"{type(exc).__name__}: {exc}"[:255]
+            NotificationAttempt.objects.create(
+                notification=notification,
+                attempt_number=attempt_number,
+                succeeded=False,
+                error=error,
+            )
+            notification.last_error = error
+            is_last = attempt_number >= max_attempts
+            notification.status = (
+                Notification.Status.FAILED if is_last else Notification.Status.PENDING
+            )
+            notification.save(update_fields=["attempts", "status", "last_error"])
+            logger.warning(
+                "Notification send failed notification_id=%s student_id=%s attempt=%s/%s error=%s",
+                notification.pk,
+                notification.student_id,
+                attempt_number,
+                max_attempts,
+                type(exc).__name__,
+            )
+            if not is_last and retry_delay:
+                time.sleep(retry_delay)
+            continue
+
+        NotificationAttempt.objects.create(
+            notification=notification,
+            attempt_number=attempt_number,
+            succeeded=True,
         )
-    except Exception as exc:  # any backend error (SMTP, network, ...)
-        notification.status = Notification.Status.FAILED
-        notification.last_error = f"{type(exc).__name__}: {exc}"[:255]
-        notification.save(update_fields=["status", "last_error"])
-        logger.warning(
-            "Notification send failed notification_id=%s student_id=%s error=%s",
+        notification.status = Notification.Status.SENT
+        notification.sent_at = timezone.now()
+        notification.last_error = ""
+        notification.save(update_fields=["attempts", "status", "sent_at", "last_error"])
+        logger.info(
+            "Notification sent notification_id=%s student_id=%s attempt=%s",
             notification.pk,
             notification.student_id,
-            type(exc).__name__,
+            attempt_number,
         )
         return notification
 
-    notification.status = Notification.Status.SENT
-    notification.sent_at = timezone.now()
-    notification.last_error = ""
-    notification.save(update_fields=["status", "sent_at", "last_error"])
-    logger.info(
-        "Notification sent notification_id=%s student_id=%s",
+    if notification.status != Notification.Status.FAILED:
+        notification.status = Notification.Status.FAILED
+        notification.save(update_fields=["status"])
+    logger.error(
+        "Notification marked failed after %s attempts notification_id=%s student_id=%s",
+        notification.attempts,
         notification.pk,
         notification.student_id,
     )

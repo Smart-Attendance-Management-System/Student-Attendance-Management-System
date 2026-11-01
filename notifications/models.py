@@ -54,6 +54,7 @@ class Notification(models.Model):
     status = models.CharField(
         max_length=10, choices=Status.choices, default=Status.PENDING
     )
+    attempts = models.PositiveSmallIntegerField(default=0)
     last_error = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     sent_at = models.DateTimeField(null=True, blank=True)
@@ -66,3 +67,30 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"Notification #{self.pk} for student {self.student_id}: {self.status}"
+
+
+class NotificationAttempt(models.Model):
+    """REQ5.4: one try at sending a notification, kept so failures are logged."""
+
+    notification = models.ForeignKey(
+        Notification,
+        on_delete=models.CASCADE,
+        related_name="attempt_log",
+    )
+    attempt_number = models.PositiveSmallIntegerField()
+    succeeded = models.BooleanField()
+    error = models.CharField(max_length=255, blank=True)
+    attempted_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["notification_id", "attempt_number"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["notification", "attempt_number"],
+                name="unique_notification_attempt_number",
+            ),
+        ]
+
+    def __str__(self):
+        outcome = "ok" if self.succeeded else "failed"
+        return f"Notification #{self.notification_id} attempt {self.attempt_number}: {outcome}"
