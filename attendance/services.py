@@ -7,7 +7,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import Count, Q
 
 from accounts.models import User
-from notifications.services import log_attendance_edit
+from notifications.services import log_attendance_edit, notify_absence, notify_absences
 from students.models import AcademicClass, Section, Student
 
 from .models import Attendance
@@ -140,6 +140,12 @@ def mark_attendance(teacher, class_id, date_value, records):
         date,
         len(entries),
     )
+    # REQ5.1: email parents of students marked Absent (reloaded so ids are set on every backend)
+    notify_absences(
+        Attendance.objects.filter(
+            academic_class=academic_class, date=date, status=Attendance.Status.ABSENT
+        ).select_related("student__parent", "academic_class")
+    )
     return entries
 
 
@@ -177,6 +183,8 @@ def edit_attendance(user, attendance, new_status, remarks=None):
         old_status,
         new_status,
     )
+    if new_status != old_status:
+        notify_absence(attendance)  # REQ5.1: only sends when the new status is Absent
     return attendance
 
 def get_daily_attendance(user, class_id, date_value, student_id=None):
