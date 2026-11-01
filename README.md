@@ -274,3 +274,26 @@ Admins can manage academic classes, sections, and subjects under:
 Sections belong to an academic class and cannot be deleted while students
 reference them. Student profiles can select a managed section while retaining
 support for existing class values.
+## Parent absence emails (REQ5.1)
+
+When a teacher marks a student **Absent** (on submission or by editing a
+record to Absent), SAMS emails the parent account linked to the student
+(`Student.parent.email`) and saves a `notifications.Notification` record.
+Present, Late, and Excused never send an email. If the student has no parent
+email, the record is still saved with status `skipped`. A failed send never
+blocks saving attendance; the record is marked `failed`.
+
+Local runs print emails to the console. To use a real mail server, set these
+in the deployment environment (never commit credentials):
+
+- `SAMS_SMTP_HOST`, `SAMS_SMTP_PORT` (default 587)
+- `SAMS_SMTP_USER`, `SAMS_SMTP_PASSWORD`
+- `SAMS_SMTP_USE_TLS` (default `1`), `SAMS_SMTP_TIMEOUT` (seconds, default 10)
+- `DEFAULT_FROM_EMAIL`
+
+Run the TC-08 tests with:
+
+```powershell
+$env:USE_SQLITE="1"
+python manage.py test notifications.tests.AbsenceNotificationIntegrationTests
+```
