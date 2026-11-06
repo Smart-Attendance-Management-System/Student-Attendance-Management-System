@@ -334,3 +334,46 @@ class UsabilityCompatibilityTests(TestCase):
         self.client.force_login(self.admin)
         response = self.client.get(reverse("pages:student_list"))
         self.assertContains(response, 'class="table-responsive"')
+
+
+
+class PopupMessageTests(TestCase):
+    """Messages show as a popup (toast) at the top instead of below the page."""
+
+    def setUp(self):
+        self.teacher = User.objects.create_user(
+            username="teacher1", password="pass12345", role=User.Role.TEACHER
+        )
+        self.admin = User.objects.create_user(
+            username="admin1", password="pass12345", role=User.Role.ADMIN
+        )
+        self.cls = AcademicClass.objects.create(name="Grade 7", class_teacher=self.teacher)
+        section = Section.objects.create(academic_class=self.cls, name="A")
+        Student.objects.create(
+            name="Pupil", student_class="Grade 7", roll_number=1,
+            contact_details="office", section=section,
+        )
+
+    def test_every_page_has_the_popup_area(self):
+        self.client.force_login(self.teacher)
+        response = self.client.get(reverse("pages:daily_attendance"))
+        self.assertContains(response, 'id="toastArea"')
+        self.assertContains(response, "function showToast(")
+
+    def test_mark_attendance_result_is_a_popup(self):
+        self.client.force_login(self.teacher)
+        response = self.client.get(reverse("pages:mark_attendance") + f"?class={self.cls.pk}")
+        self.assertContains(response, "showToast(kind, text)")
+        self.assertNotContains(response, 'id="result"')
+
+    def test_server_messages_show_as_a_popup(self):
+        other = User.objects.create_user(
+            username="spare", password="pass12345", role=User.Role.TEACHER
+        )
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse("accounts:delete", args=[other.pk]), follow=True
+        )
+        self.assertContains(response, 'class="toast border-0 border-start border-4 border-success"')
+        self.assertContains(response, "User account deleted successfully.")
+        self.assertNotContains(response, 'class="alert alert-info"')

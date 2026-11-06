@@ -49,14 +49,54 @@
     {% endif %}
   </div>
 </nav>
+<div id="toastArea" class="toast-container position-fixed end-0 p-3" style="top: 3.5rem; z-index: 1090;" aria-live="polite" aria-atomic="true">
+  {% for message in messages %}
+  <div class="toast border-0 border-start border-4 border-{% if message.tags == 'error' %}danger{% elif message.tags %}{{ message.tags }}{% else %}info{% endif %}" role="alert">
+    <div class="d-flex">
+      <div class="toast-body">{{ message }}</div>
+      <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+  </div>
+  {% endfor %}
+</div>
 <div class="container pb-5">
-  {% if messages %}
-    {% for message in messages %}
-      <div class="alert alert-info">{{ message }}</div>
-    {% endfor %}
-  {% endif %}
   {% block content %}{% endblock %}
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  // Popup (toast) messages at the top of the screen. kind is success, warning, danger or info.
+  function showToast(kind, text) {
+    const toast = document.createElement("div");
+    toast.className = "toast border-0 border-start border-4 border-" + kind;
+    toast.setAttribute("role", "alert");
+    const row = document.createElement("div");
+    row.className = "d-flex";
+    const body = document.createElement("div");
+    body.className = "toast-body";
+    body.textContent = text;
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "btn-close me-2 m-auto";
+    close.setAttribute("data-bs-dismiss", "toast");
+    close.setAttribute("aria-label", "Close");
+    row.append(body, close);
+    toast.appendChild(row);
+    // show only the latest message, so repeated clicks do not stack copies
+    document.getElementById("toastArea").replaceChildren(toast);
+    startToast(toast);
+  }
+
+  function startToast(toast) {
+    const delay = toast.classList.contains("border-success") ? 5000 : 8000;
+    if (!window.bootstrap) {
+      toast.classList.add("show");
+      return;
+    }
+    toast.addEventListener("hidden.bs.toast", () => toast.remove());
+    bootstrap.Toast.getOrCreateInstance(toast, { delay: delay }).show();
+  }
+
+  document.querySelectorAll("#toastArea .toast").forEach(startToast);
+</script>
 </body>
 </html>
