@@ -6,6 +6,7 @@ from django.utils import timezone
 
 from accounts.models import User
 from accounts.permissions import IsAdmin, IsStudentParent, IsTeacher
+from attendance.models import Attendance
 from students.models import AcademicClass, Student
 
 STATUSES = ["Present", "Absent", "Late", "Excused"]
@@ -41,7 +42,32 @@ def home(request):
         return redirect("pages:student_list")
     if request.user.role == User.Role.STUDENT_PARENT:
         return redirect("pages:my_attendance")
-    return render(request, "pages/home.html")
+    return teacher_dashboard(request)
+
+
+def teacher_dashboard(request):
+    """Teacher home page: each of their classes and whether today's attendance is marked."""
+    today = timezone.localdate()
+    rows = []
+    for academic_class in AcademicClass.objects.filter(
+        class_teacher=request.user
+    ).order_by("name"):
+        todays_records = Attendance.objects.filter(
+            academic_class=academic_class, date=today
+        )
+        rows.append(
+            {
+                "academic_class": academic_class,
+                "student_count": Student.objects.filter(
+                    section__academic_class=academic_class
+                ).count(),
+                "marked": todays_records.exists(),
+                "absent_count": todays_records.filter(
+                    status=Attendance.Status.ABSENT
+                ).count(),
+            }
+        )
+    return render(request, "pages/home.html", {"rows": rows, "today": today})
 
 
 @role_required(User.Role.ADMIN, User.Role.TEACHER)

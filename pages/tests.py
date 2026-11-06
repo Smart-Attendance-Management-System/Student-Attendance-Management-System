@@ -334,3 +334,66 @@ class UsabilityCompatibilityTests(TestCase):
         self.client.force_login(self.admin)
         response = self.client.get(reverse("pages:student_list"))
         self.assertContains(response, 'class="table-responsive"')
+
+
+
+class TeacherDashboardTests(TestCase):
+    def setUp(self):
+        self.teacher = User.objects.create_user(
+            username="teacher1", password="pass12345", role=User.Role.TEACHER
+        )
+        self.other = User.objects.create_user(
+            username="teacher2", password="pass12345", role=User.Role.TEACHER
+        )
+        self.cls = AcademicClass.objects.create(name="Grade 10", class_teacher=self.teacher)
+        section = Section.objects.create(academic_class=self.cls, name="A")
+        self.students = [
+            Student.objects.create(
+                name=f"Student {n}", student_class="Grade 10", roll_number=n,
+                contact_details=f"p{n}@example.com", section=section,
+            )
+            for n in (1, 2)
+        ]
+        AcademicClass.objects.create(name="Grade 9", class_teacher=self.other)
+
+    def test_shows_only_the_teachers_own_classes(self):
+        self.client.force_login(self.teacher)
+        response = self.client.get(reverse("pages:home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Your classes today")
+        self.assertContains(response, "Grade 10")
+        self.assertNotContains(response, "Grade 9")
+        self.assertNotContains(response, "coming soon")
+
+    def test_unmarked_class_shows_mark_button(self):
+        self.client.force_login(self.teacher)
+        response = self.client.get(reverse("pages:home"))
+        self.assertContains(response, "Not marked")
+        self.assertContains(response, f"?class={self.cls.pk}")
+
+    def test_marked_class_shows_marked_and_absent_count(self):
+        from attendance import services
+
+        services.mark_attendance(
+            self.teacher, self.cls.pk, timezone.localdate().isoformat(),
+            [{"studentId": self.students[0].pk, "status": "Absent"}],
+        )
+        self.client.force_login(self.teacher)
+        response = self.client.get(reverse("pages:home"))
+        self.assertContains(response, "Marked")
+        self.assertContains(response, "1 absent")
+        self.assertNotContains(response, f"?class={self.cls.pk}")
+
+    def test_class_with_no_students(self):
+        AcademicClass.objects.create(name="Grade 8", class_teacher=self.teacher)
+        self.client.force_login(self.teacher)
+        response = self.client.get(reverse("pages:home"))
+        self.assertContains(response, "No students yet")
+
+    def test_teacher_with_no_classes(self):
+        lonely = User.objects.create_user(
+            username="teacher3", password="pass12345", role=User.Role.TEACHER
+        )
+        self.client.force_login(lonely)
+        response = self.client.get(reverse("pages:home"))
+        self.assertContains(response, "No classes yet")
