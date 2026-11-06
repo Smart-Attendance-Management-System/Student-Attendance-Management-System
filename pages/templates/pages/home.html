@@ -1,9 +1,59 @@
 {% extends "pages/base.html" %}
 {% block content %}
+<div class="mb-4">
+  <h1 class="h4 mb-1">Welcome, {{ request.user.get_full_name|default:request.user.username }}</h1>
+  <p class="text-muted mb-0">Today is {{ today|date:"l, j F Y" }}</p>
+</div>
+
+{% if rows %}
 <div class="card shadow-sm">
   <div class="card-body">
-    <h1 class="h4">Welcome</h1>
-    <p class="mb-0">Your attendance dashboard is coming soon.</p>
+    <h2 class="h5 mb-3">Your classes today</h2>
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Class</th>
+            <th>Students</th>
+            <th>Today's attendance</th>
+            <th class="text-end">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr>
+            <td>{{ row.academic_class }}</td>
+            <td>{{ row.student_count }}</td>
+            <td>
+              {% if row.marked %}
+                <span class="badge text-bg-success">Marked</span>
+                {% if row.absent_count %}<span class="text-muted small ms-1">{{ row.absent_count }} absent</span>{% endif %}
+              {% else %}
+                <span class="badge text-bg-warning">Not marked</span>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              {% if row.marked %}
+                <a class="btn btn-sm btn-outline-secondary" href="{% url 'pages:daily_attendance' %}">View</a>
+              {% elif row.student_count %}
+                <a class="btn btn-sm btn-primary" href="{% url 'pages:mark_attendance' %}?class={{ row.academic_class.pk }}">Mark attendance</a>
+              {% else %}
+                <span class="text-muted small">No students yet</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>
+{% else %}
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h2 class="h5">No classes yet</h2>
+    <p class="mb-0 text-muted">You are not assigned to any class. Ask an admin to assign you as a class teacher.</p>
+  </div>
+</div>
+{% endif %}
 {% endblock %}
