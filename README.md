@@ -4,7 +4,8 @@
 
 1. Create and activate a virtual environment.
 2. Install dependencies from [requirements.txt](./requirements.txt).
-3. Use SQLite for local runs:
+3. Use SQLite for local runs (this is also the default when no complete
+   `DB_NAME`, `DB_USER`, and `DB_PASSWORD` configuration is present):
 
 ```powershell
 $env:USE_SQLITE="1"
@@ -16,6 +17,9 @@ $env:USE_SQLITE="1"
 python manage.py migrate
 python manage.py runserver
 ```
+
+To return to SQLite after using MySQL, unset the `DB_NAME`, `DB_USER`, and
+`DB_PASSWORD` variables, or set `$env:USE_SQLITE="1"`.
 
 ## Application structure and maintainability
 
@@ -101,10 +105,68 @@ blindly.
 
 ### MySQL
 
-Prerequisites: `mysqldump` and `mysql` must be installed and available on
-`PATH`. Configure `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, and
-`DB_PORT` as deployment environment variables; never place credentials in a
-backup command or committed file:
+MySQL deployment requires:
+
+- MySQL Server 8.0 or a compatible MySQL installation.
+- The MySQL client tools `mysql` and `mysqldump` on `PATH` for backup and
+  restore commands.
+- Python build/runtime support for the `PyMySQL` dependency in
+  `requirements.txt`.
+
+Create the required database and a dedicated application user using an
+administrative MySQL account. Replace the example password with a secret that
+is not committed:
+
+```sql
+CREATE DATABASE sams CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'sams_app'@'localhost' IDENTIFIED BY 'replace-with-a-secret';
+GRANT ALL PRIVILEGES ON sams.* TO 'sams_app'@'localhost';
+FLUSH PRIVILEGES;
+```
+
+Configure the application through environment variables. `DB_NAME` should be
+`sams`; `DB_HOST` and `DB_PORT` default to `localhost` and `3306`.
+
+```powershell
+$env:USE_SQLITE=$null
+$env:DB_NAME="sams"
+$env:DB_USER="sams_app"
+$env:DB_PASSWORD="replace-with-a-secret"
+$env:DB_HOST="localhost"
+$env:DB_PORT="3306"
+python manage.py check
+python manage.py migrate
+python manage.py runserver
+```
+
+Do not put the password in source control or in a committed PowerShell
+script. MySQL is selected only when all three required variables are present;
+partial configuration fails explicitly. Setting `USE_SQLITE=1` deliberately
+keeps SQLite selected.
+
+Run the test suite against MySQL only after configuring a reachable MySQL
+server and an isolated test database. Django's test runner creates and
+destroys its test database from the configured `DB_NAME`:
+
+```powershell
+$env:USE_SQLITE=$null
+$env:DB_NAME="sams"
+$env:DB_USER="sams_app"
+$env:DB_PASSWORD="replace-with-a-secret"
+$env:DB_HOST="localhost"
+$env:DB_PORT="3306"
+python manage.py test
+```
+
+The repository's default CI/local test command remains SQLite:
+
+```powershell
+$env:USE_SQLITE="1"
+python manage.py test
+```
+
+MySQL backups use `mysqldump --single-transaction --routines --triggers`
+and MySQL restore streams the SQL dump into `mysql`:
 
 ```powershell
 python manage.py backup_database backup --output C:\var\backups\sams\attendance-2026-10-30.sql
@@ -113,12 +175,10 @@ python manage.py backup_database restore `
   --confirm-restore
 ```
 
-The MySQL path uses `mysqldump --single-transaction --routines --triggers`
-and streams restore input to `mysql`. It does not support replacing a live
-database implicitly; the explicit confirmation flag is required. Verify the
-restored data with `python manage.py check` and a read-only Django shell query
-as shown above. Test restoration against a disposable database first when
-operationally possible.
+The MySQL backup command does not support replacing a live database
+implicitly; the explicit confirmation flag is required. Verify the restored
+data with `python manage.py check` and a read-only Django shell query. Test
+restoration against a disposable database first when operationally possible.
 
 ## Login API
 
