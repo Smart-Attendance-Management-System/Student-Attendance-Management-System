@@ -8,7 +8,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods
 
 from accounts.models import User
-from accounts.permissions import IsAdmin
+from accounts.permissions import IsAdmin, IsTeacher
 from .bulk_import import BulkImportError, import_students
 from .forms import AcademicClassForm, SectionForm, StudentForm, SubjectForm
 from .models import AcademicClass, Section, Student, Subject
@@ -22,6 +22,21 @@ def _admin_required(view_func):
             return redirect("login")
         if not IsAdmin().has_permission(request, view_func):
             return HttpResponseForbidden("Only admins can manage these records.")
+        return view_func(request, *args, **kwargs)
+
+    wrapped.__name__ = view_func.__name__
+    return wrapped
+
+
+def _admin_or_teacher_required(view_func):
+    def wrapped(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect("login")
+        if not (
+            IsAdmin().has_permission(request, view_func)
+            or IsTeacher().has_permission(request, view_func)
+        ):
+            return HttpResponseForbidden("Only admins and teachers can view students.")
         return view_func(request, *args, **kwargs)
 
     wrapped.__name__ = view_func.__name__
@@ -53,7 +68,7 @@ def student_create(request):
 
 
 @login_required(login_url="login")
-@_admin_required
+@_admin_or_teacher_required
 @require_http_methods(["GET"])
 def student_list(request):
     students = Student.objects.all()

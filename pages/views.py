@@ -39,7 +39,7 @@ def role_required(*roles):
 @login_required(login_url="login")
 def home(request):
     if request.user.role == User.Role.ADMIN:
-        return redirect("pages:student_list")
+        return redirect("students:list")
     if request.user.role == User.Role.STUDENT_PARENT:
         return redirect("pages:my_attendance")
     return teacher_dashboard(request)
@@ -71,9 +71,8 @@ def teacher_dashboard(request):
 
 
 @role_required(User.Role.ADMIN, User.Role.TEACHER)
-def student_list(request):
-    students = Student.objects.select_related("section").all()
-    return render(request, "pages/student_list.html", {"students": students})
+def legacy_student_list(request):
+    return redirect("students:list")
 
 
 @role_required(User.Role.TEACHER)
