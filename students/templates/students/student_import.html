@@ -1,34 +1,39 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Import Students</title>
-</head>
-<body>
-    <h1>Import Students</h1>
-    <p>Upload a UTF-8 CSV or .xlsx file no larger than 5 MB.</p>
-    <p>Required columns: name, class, roll_number, contact_details. Optional column: section.</p>
-    {% if error %}
-        <p role="alert">{{ error }}</p>
-    {% endif %}
-    {% if import_result %}
-        <div role="status">
-            <p>{{ import_result.imported_count }} student profiles imported successfully.</p>
-            <p>{{ import_result.failed_count }} rows failed and were skipped.</p>
-            <p>Failed rows refer to physical file rows, including the header as row 1.</p>
-            <ul>
-                {% for failure in import_result.failures %}
-                    <li>Row {{ failure.row_number }}: {{ failure.reason }}</li>
-                {% endfor %}
-            </ul>
-        </div>
-    {% endif %}
-    <form method="post" enctype="multipart/form-data">
-        {% csrf_token %}
-        <label for="file">Student file:</label>
-        <input id="file" type="file" name="file" accept=".csv,.xlsx" required>
-        <button type="submit">Import</button>
-    </form>
-    <p><a href="{% url 'students:list' %}">Back to students</a></p>
-</body>
-</html>
+{% extends "pages/base.html" %}
+
+{% block title %}Import Students - SAMS{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-body">
+        <h1 class="h2 card-title">Import Students</h1>
+        <p>Upload a UTF-8 CSV or .xlsx file no larger than 5 MB.</p>
+        <p>Required columns: name, class, roll_number, contact_details. Optional column: section.</p>
+        {% if error %}
+            <p class="alert alert-danger" role="alert">{{ error }}</p>
+        {% endif %}
+        {% if import_result %}
+            <div class="alert alert-info" role="status">
+                <p>{{ import_result.imported_count }} student profiles imported successfully.</p>
+                <p>{{ import_result.failed_count }} rows failed and were skipped.</p>
+                <p>Failed rows refer to physical file rows, including the header as row 1.</p>
+                <ul class="mb-0">
+                    {% for failure in import_result.failures %}
+                        <li>Row {{ failure.row_number }}: {{ failure.reason }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="mb-3">
+                <label class="form-label" for="file">Student file:</label>
+                <input id="file" class="form-control" type="file" name="file" accept=".csv,.xlsx" required>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+                <button type="submit" class="btn btn-primary">Import</button>
+                <a class="btn btn-outline-secondary" href="{% url 'students:list' %}">Back to students</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
