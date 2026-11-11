@@ -65,7 +65,6 @@
     <button type="button" id="submitAttendance" class="btn btn-primary">Submit attendance</button>
     <span id="tally" class="small text-muted" aria-live="polite"></span>
   </div>
-  <div id="result" class="mt-3"></div>
 
   <script>
     const csrfToken = "{{ csrf_token }}";
@@ -90,8 +89,7 @@
     updateTally();
 
     function showResult(kind, text) {
-      document.getElementById("result").innerHTML =
-        '<div class="alert alert-' + kind + '">' + text + "</div>";
+      showToast(kind, text);
     }
 
     document.getElementById("submitAttendance").addEventListener("click", async () => {
