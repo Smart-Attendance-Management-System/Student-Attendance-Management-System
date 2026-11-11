@@ -166,6 +166,49 @@ class StudentProfileTests(TestCase):
             student.full_clean()
 
 
+class SharedLayoutIntegrationTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            username="layout-admin",
+            password="pass12345",
+            first_name="Ada",
+            last_name="Admin",
+            role=User.Role.ADMIN,
+        )
+        self.student = Student.objects.create(
+            name="Layout Student",
+            student_class="Grade 10",
+            roll_number=101,
+            contact_details="layout@example.com",
+        )
+        self.academic_class = AcademicClass.objects.create(name="Grade 10")
+        self.client.force_login(self.admin)
+
+    def test_all_student_and_catalog_templates_use_shared_authenticated_layout(self):
+        pages = (
+            ("students:list", (), "students/student_list.html"),
+            ("students:detail", (self.student.pk,), "students/student_detail.html"),
+            ("students:create", (), "students/student_form.html"),
+            ("students:import", (), "students/student_import.html"),
+            ("classes:list", (), "students/catalog_list.html"),
+            ("classes:detail", (self.academic_class.pk,), "students/catalog_detail.html"),
+            ("classes:create", (), "students/catalog_form.html"),
+        )
+
+        for url_name, args, template_name in pages:
+            with self.subTest(url_name=url_name):
+                response = self.client.get(reverse(url_name, args=args))
+
+                self.assertEqual(response.status_code, 200)
+                self.assertTemplateUsed(response, template_name)
+                self.assertTemplateUsed(response, "pages/base.html")
+                self.assertContains(response, 'href="/accounts/users/"')
+                self.assertContains(response, "Ada Admin")
+                self.assertContains(response, "Admin")
+                self.assertContains(response, 'action="/accounts/logout/"')
+                self.assertContains(response, "name=\"csrfmiddlewaretoken\"")
+
+
 class ClassSectionSubjectTests(TestCase):
     def setUp(self):
         self.admin = User.objects.create_user(
