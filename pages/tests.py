@@ -162,6 +162,14 @@ class DailyPageAndNavigationTests(TestCase):
         self.assertContains(response, "Mark attendance")
         self.assertNotContains(response, "Admin site")
 
+    def test_daily_page_includes_attendance_edit_control(self):
+        teacher = self.make_user(User.Role.TEACHER)
+        AcademicClass.objects.create(name="Grade 10", class_teacher=teacher)
+        self.client.force_login(teacher)
+        response = self.client.get(reverse("pages:daily_attendance"))
+        self.assertContains(response, "Edit attendance")
+        self.assertContains(response, 'id="editForm"')
+
     def test_staff_user_sees_link_to_admin_site(self):
         self.client.force_login(self.make_user(User.Role.ADMIN, is_staff=True))
         response = self.client.get(reverse("students:list"))
