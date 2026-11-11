@@ -29,14 +29,18 @@ class PageAccessTests(TestCase):
 
     def test_teacher_can_open_both_pages(self):
         self.client.force_login(self.make_user(User.Role.TEACHER))
-        self.assertEqual(self.client.get(reverse("pages:student_list")).status_code, 200)
+        response = self.client.get(reverse("pages:student_list"))
+        self.assertRedirects(response, reverse("students:list"), fetch_redirect_response=False)
+        self.assertEqual(self.client.get(reverse("students:list")).status_code, 200)
         response = self.client.get(reverse("pages:mark_attendance"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Mark attendance")
 
     def test_admin_can_open_student_list(self):
         self.client.force_login(self.make_user(User.Role.ADMIN))
-        self.assertEqual(self.client.get(reverse("pages:student_list")).status_code, 200)
+        response = self.client.get(reverse("pages:student_list"))
+        self.assertRedirects(response, reverse("students:list"), fetch_redirect_response=False)
+        self.assertEqual(self.client.get(reverse("students:list")).status_code, 200)
 
     def test_admin_is_redirected_from_mark_attendance(self):
         self.client.force_login(self.make_user(User.Role.ADMIN))
@@ -48,6 +52,21 @@ class PageAccessTests(TestCase):
         for name in ("pages:student_list", "pages:mark_attendance"):
             response = self.client.get(reverse(name))
             self.assertRedirects(response, reverse("pages:home"), fetch_redirect_response=False)
+
+    def test_student_list_urls_share_canonical_route(self):
+        admin = self.make_user(User.Role.ADMIN)
+        self.client.force_login(admin)
+
+        legacy_response = self.client.get(reverse("pages:student_list"))
+        self.assertRedirects(
+            legacy_response,
+            reverse("students:list"),
+            fetch_redirect_response=False,
+        )
+        canonical_response = self.client.get(reverse("students:list"))
+        self.assertEqual(canonical_response.status_code, 200)
+        self.assertContains(canonical_response, "Student Profiles")
+        self.assertNotContains(canonical_response, "Subjects")
 
     def test_header_shows_name_role_and_logout(self):
         self.client.force_login(self.make_user(User.Role.TEACHER))
@@ -145,7 +164,7 @@ class DailyPageAndNavigationTests(TestCase):
 
     def test_staff_user_sees_link_to_admin_site(self):
         self.client.force_login(self.make_user(User.Role.ADMIN, is_staff=True))
-        response = self.client.get(reverse("pages:student_list"))
+        response = self.client.get(reverse("students:list"))
         self.assertContains(response, reverse("admin:index"))
         self.assertContains(response, "Admin site")
 
@@ -277,10 +296,10 @@ class UsabilityCompatibilityTests(TestCase):
             self.teacher: [
                 reverse("pages:mark_attendance") + f"?class={self.cls.pk}",
                 reverse("pages:daily_attendance"),
-                reverse("pages:student_list"),
+                reverse("students:list"),
             ],
             self.admin: [
-                reverse("pages:student_list"),
+                reverse("students:list"),
                 reverse("pages:attendance_summary"),
                 reverse("pages:daily_attendance"),
                 reverse("accounts:list"),
@@ -332,8 +351,8 @@ class UsabilityCompatibilityTests(TestCase):
         response = self.client.get(reverse("pages:mark_attendance") + f"?class={self.cls.pk}")
         self.assertContains(response, 'class="table-responsive"')
         self.client.force_login(self.admin)
-        response = self.client.get(reverse("pages:student_list"))
-        self.assertContains(response, 'class="table-responsive"')
+        response = self.client.get(reverse("students:list"))
+        self.assertContains(response, 'class="list-group list-group-flush"')
 
 
 
