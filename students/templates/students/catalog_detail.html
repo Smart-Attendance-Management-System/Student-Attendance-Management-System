@@ -1,12 +1,13 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>{{ title }}</title>
-</head>
-<body>
-    <h1>{{ title }}</h1>
-    <p>{{ record }}</p>
-    <p><a href="{% url list_url %}">Back to list</a></p>
-</body>
-</html>
+{% extends "pages/base.html" %}
+
+{% block title %}{{ title }} - SAMS{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-body">
+        <h1 class="h2 card-title">{{ title }}</h1>
+        <p class="card-text">{{ record }}</p>
+        <a class="btn btn-outline-secondary" href="{% url list_url %}">Back to list</a>
+    </div>
+</div>
+{% endblock %}
