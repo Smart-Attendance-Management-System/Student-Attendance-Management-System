@@ -1,34 +1,33 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Student Profiles</title>
-</head>
-<body>
-    <h1>Student Profiles</h1>
-    {% if messages %}
-        <ul>
-            {% for message in messages %}
-                <li>{{ message }}</li>
-            {% endfor %}
-        </ul>
-    {% endif %}
-    <a href="{% url 'students:create' %}">Create Student</a>
-    <a href="{% url 'students:import' %}">Import Students</a>
-    <ul>
+{% extends "pages/base.html" %}
+
+{% block title %}Student Profiles - SAMS{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <h1 class="h2 mb-0">Student Profiles</h1>
+    <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-outline-primary" href="{% url 'students:import' %}">Import Students</a>
+        <a class="btn btn-primary" href="{% url 'students:create' %}">Create Student</a>
+    </div>
+</div>
+<div class="card shadow-sm">
+    <div class="list-group list-group-flush">
         {% for student in students %}
-            <li>
-                {{ student.name }} - {{ student.student_class }} - Roll {{ student.roll_number }}
-                <a href="{% url 'students:detail' student.pk %}">View</a>
-                <a href="{% url 'students:update' student.pk %}">Edit</a>
-                <form method="post" action="{% url 'students:delete' student.pk %}" style="display:inline;">
-                    {% csrf_token %}
-                    <button type="submit" onclick="return confirm('Delete this student profile?')">Delete</button>
-                </form>
-            </li>
+            <div class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <span>{{ student.name }} - {{ student.student_class }} - Roll {{ student.roll_number }}</span>
+                <div class="d-flex gap-2">
+                    <a class="btn btn-outline-secondary btn-sm" href="{% url 'students:detail' student.pk %}">View</a>
+                    <a class="btn btn-outline-secondary btn-sm" href="{% url 'students:update' student.pk %}">Edit</a>
+                    <form method="post" action="{% url 'students:delete' student.pk %}" class="m-0">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-outline-danger btn-sm"
+                                onclick="return confirm('Delete this student profile?')">Delete</button>
+                    </form>
+                </div>
+            </div>
         {% empty %}
-            <li>No student profiles found.</li>
+            <div class="list-group-item text-muted">No student profiles found.</div>
         {% endfor %}
-    </ul>
-</body>
-</html>
+    </div>
+</div>
+{% endblock %}

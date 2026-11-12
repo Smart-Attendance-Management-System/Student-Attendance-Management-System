@@ -1,14 +1,23 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>{{ student.name }}</title>
-</head>
-<body>
-    <h1>{{ student.name }}</h1>
-    <p><strong>Class:</strong> {{ student.student_class }}</p>
-    <p><strong>Roll Number:</strong> {{ student.roll_number }}</p>
-    <p><strong>Contact Details:</strong> {{ student.contact_details }}</p>
-    <p><a href="{% url 'students:update' student.pk %}">Edit</a> | <a href="{% url 'students:list' %}">Back to list</a></p>
-</body>
-</html>
+{% extends "pages/base.html" %}
+
+{% block title %}{{ student.name }} - SAMS{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-body">
+        <h1 class="h2 card-title">{{ student.name }}</h1>
+        <dl class="row">
+            <dt class="col-sm-3">Class</dt>
+            <dd class="col-sm-9">{{ student.student_class }}</dd>
+            <dt class="col-sm-3">Roll Number</dt>
+            <dd class="col-sm-9">{{ student.roll_number }}</dd>
+            <dt class="col-sm-3">Contact Details</dt>
+            <dd class="col-sm-9">{{ student.contact_details }}</dd>
+        </dl>
+        <div class="d-flex flex-wrap gap-2">
+            <a class="btn btn-primary" href="{% url 'students:update' student.pk %}">Edit</a>
+            <a class="btn btn-outline-secondary" href="{% url 'students:list' %}">Back to list</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
