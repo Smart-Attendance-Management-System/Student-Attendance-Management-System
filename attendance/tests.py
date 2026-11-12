@@ -15,7 +15,7 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from accounts.models import User
-from notifications.models import AuditLog
+from notifications.models import AuditLog, Notification
 from students.models import AcademicClass, Section, Student
 
 from . import services
@@ -228,6 +228,11 @@ class EditAttendanceApiTests(AttendanceTestBase):
         log = AuditLog.objects.get()
         self.assertEqual(log.edited_by, self.teacher)
         self.assertEqual((log.old_status, log.new_status), ("Present", "Absent"))
+        daily = self.client.get(
+            reverse("attendance:daily"),
+            {"classId": self.cls.pk, "date": TODAY},
+        )
+        self.assertEqual(daily.json()["records"][0]["status"], "Absent")
 
     def test_wrong_teacher_cannot_edit(self):
         self.client.force_login(self.other_teacher)
@@ -244,6 +249,58 @@ class EditAttendanceApiTests(AttendanceTestBase):
         self.client.force_login(self.teacher)
         response = self.post_json(reverse("attendance:edit", args=[9999]), {"status": "Absent"})
         self.assertEqual(response.status_code, 404)
+
+    def test_editing_same_status_does_not_create_audit_or_notification(self):
+        self.client.force_login(self.teacher)
+        response = self.post_json(self.edit_url(), {"status": "Present"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(AuditLog.objects.count(), 0)
+        self.assertEqual(Notification.objects.count(), 0)
+
+    def test_parent_cannot_edit(self):
+        parent = User.objects.create_user(
+            username="parent-edit",
+            password="pass12345",
+            role=User.Role.STUDENT_PARENT,
+        )
+        self.client.force_login(parent)
+        response = self.post_json(self.edit_url(), {"status": "Absent"})
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(AuditLog.objects.count(), 0)
+
+    def test_admin_can_edit_through_django_admin_with_one_audit_entry(self):
+        admin_user = User.objects.create_superuser(
+            username="site-admin",
+            password="pass12345",
+            email="admin@example.com",
+        )
+        admin_user.role = User.Role.ADMIN
+        admin_user.save(update_fields=["role"])
+        self.client.force_login(admin_user)
+
+        response = self.client.post(
+            reverse("admin:attendance_attendance_change", args=[self.record.pk]),
+            {
+                "student": self.record.student_id,
+                "academic_class": self.record.academic_class_id,
+                "date": self.record.date.isoformat(),
+                "status": "Late",
+                "remarks": self.record.remarks,
+                "marked_by": self.record.marked_by_id,
+                "_save": "Save",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.record.refresh_from_db()
+        self.assertEqual(self.record.status, "Late")
+        self.assertEqual(AuditLog.objects.count(), 1)
+        self.assertEqual(
+            AuditLog.objects.values_list("old_status", "new_status").get(),
+            ("Present", "Late"),
+        )
 
 class DailyAttendanceApiTests(AttendanceTestBase):
     """REQ4.1: daily attendance view for a class and date."""
@@ -277,6 +334,17 @@ class DailyAttendanceApiTests(AttendanceTestBase):
         self.assertEqual(
             body["counts"], {"Present": 1, "Absent": 1, "Late": 1, "Excused": 0}
         )
+        self.assertTrue(all(record["canEdit"] for record in body["records"]))
+
+    def test_unassigned_teacher_and_admin_cannot_edit_daily_records(self):
+        self.mark_with_exceptions()
+
+        self.client.force_login(self.other_teacher)
+        self.assertEqual(self.get_daily().status_code, 403)
+
+        self.client.force_login(self.admin)
+        admin_body = self.get_daily().json()
+        self.assertFalse(any(record["canEdit"] for record in admin_body["records"]))
 
     def test_day_with_no_attendance_returns_clear_message(self):
         self.client.force_login(self.teacher)

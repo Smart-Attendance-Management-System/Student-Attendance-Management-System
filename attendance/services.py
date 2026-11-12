@@ -149,9 +149,12 @@ def mark_attendance(teacher, class_id, date_value, records):
     return entries
 
 
-def edit_attendance(user, attendance, new_status, remarks=None):
+def edit_attendance(user, attendance, new_status, remarks=None, allow_admin=False):
     """Change one student's status and record the change in the audit log."""
-    if not is_class_teacher(user, attendance.academic_class):
+    can_edit = is_class_teacher(user, attendance.academic_class)
+    if allow_admin:
+        can_edit = can_edit or user.role == User.Role.ADMIN
+    if not can_edit:
         logger.warning(
             "Attendance edit rejected: unassigned teacher user_id=%s attendance_id=%s",
             user.pk,
@@ -161,10 +164,18 @@ def edit_attendance(user, attendance, new_status, remarks=None):
     if not is_valid_status(new_status):
         raise AttendanceError(f"Invalid status: {new_status}.", 400)
 
-    old_status = attendance.status
+    original = Attendance.objects.filter(pk=attendance.pk).values(
+        "status", "remarks"
+    ).first()
+    if original is None:
+        raise AttendanceError("Attendance record not found.", 404)
+    old_status = original["status"]
+    old_remarks = original["remarks"]
     attendance.status = new_status
     if remarks is not None:
         attendance.remarks = remarks[:255]
+    if attendance.status == old_status and attendance.remarks == old_remarks:
+        return attendance
     attendance.save()  # updated_at changes automatically (REQ3.3)
 
     log_attendance_edit(
@@ -236,6 +247,8 @@ def get_daily_attendance(user, class_id, date_value, student_id=None):
                 "name": r.student.name,
                 "status": r.status,
                 "remarks": r.remarks,
+                "canEdit": user.role == User.Role.TEACHER
+                and is_class_teacher(user, academic_class),
             }
             for r in records
         ],

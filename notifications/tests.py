@@ -137,6 +137,21 @@ class AbsenceNotificationIntegrationTests(AbsenceNotificationTestBase):
         self.assertEqual(mail.outbox[0].to, ["parent2@example.com"])
         self.assertEqual(Notification.objects.get().attendance, record)
 
+    def test_editing_already_absent_does_not_send_duplicate_alert(self):
+        self.submit({0: "Absent"})
+        record = Attendance.objects.get(student=self.students[0])
+        self.assertEqual(len(mail.outbox), 1)
+
+        response = self.client.post(
+            reverse("attendance:edit", args=[record.pk]),
+            json.dumps({"status": "Absent"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(Notification.objects.filter(attendance=record).count(), 1)
+
     def test_student_without_parent_email_is_recorded_as_skipped(self):
         self.parents[0].email = ""
         self.parents[0].save()
