@@ -102,7 +102,7 @@ class CrossModuleFlowTests(TestCase):
         )
 
         # Admin can see the new students on the student list page
-        page = self.admin_client.get(reverse("pages:student_list"))
+        page = self.admin_client.get(reverse("students:list"))
         self.assertContains(page, "Asha Rao")
 
         # Teacher logs in and opens the mark attendance page for the class
