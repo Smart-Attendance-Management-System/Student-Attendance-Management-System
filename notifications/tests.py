@@ -64,7 +64,6 @@ class AbsenceNotificationTestBase(TestCase):
             self.students.append(
                 Student.objects.create(
                     name=f"Child {n}",
-                    student_class="Grade 9",
                     roll_number=100 + n,
                     contact_details="School office",
                     section=section,

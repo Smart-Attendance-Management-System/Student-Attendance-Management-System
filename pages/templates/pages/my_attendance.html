@@ -13,7 +13,7 @@
       <label for="studentSelect" class="form-label">Student</label>
       <select id="studentSelect" class="form-select">
         {% for child in children %}
-          <option value="{{ child.pk }}">{{ child.name }} ({{ child.student_class }})</option>
+          <option value="{{ child.pk }}">{{ child.name }} ({{ child.class_name }})</option>
         {% endfor %}
       </select>
     </div>

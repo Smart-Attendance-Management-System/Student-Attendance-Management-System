@@ -130,5 +130,5 @@ def attendance_summary(request):
 @role_required(User.Role.STUDENT_PARENT)
 def my_attendance(request):
     """REQ4.2 screen: a parent sees the attendance history of their own children."""
-    children = request.user.children.order_by("name")
+    children = request.user.children.select_related("section__academic_class").order_by("name")
     return render(request, "pages/my_attendance.html", {"children": children})
