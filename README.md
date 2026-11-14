@@ -216,8 +216,11 @@ Student profiles are managed under `/students/`.
 Only users with role `ADMIN` can create, update, or delete profiles.
 Admins can bulk import students from `/students/import/`.
 Imports accept UTF-8 `.csv` and `.xlsx` files up to 5 MB.
-Required columns are `name`, `class`, `roll_number`, and `contact_details`;
-`section` is optional and must belong to the specified class.
+Required columns are `name`, `class`, `section`, `roll_number`, and
+`contact_details`; the section must already exist in the specified class.
+Every student must have a section, because attendance finds students through
+their section. The student list shows admins any older students that still
+have no section, with a link to fix each one.
 Each data row is validated independently. Invalid rows are skipped and reported
 with their physical file row number (the header is row 1), while valid rows
 from the same file are saved. Structural file errors, such as missing required
@@ -272,8 +275,7 @@ Admins can manage academic classes, sections, and subjects under:
 - `/subjects/`
 
 Sections belong to an academic class and cannot be deleted while students
-reference them. Student profiles can select a managed section while retaining
-support for existing class values.
+reference them. Every student profile must select a managed section.
 ## Parent absence emails (REQ5.1)
 
 When a teacher marks a student **Absent** (on submission or by editing a

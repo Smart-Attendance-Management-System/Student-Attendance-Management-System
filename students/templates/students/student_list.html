@@ -12,6 +12,18 @@
     </div>
     {% endif %}
 </div>
+{% if students_without_section %}
+<div class="alert alert-warning" role="alert" id="students-without-section">
+    <h2 class="h5">{{ students_without_section|length }} student{{ students_without_section|length|pluralize }} without a section</h2>
+    <p>These students do not appear on the Mark attendance page. Edit each one and choose a section.</p>
+    <ul class="mb-0">
+        {% for student in students_without_section %}
+            <li>{{ student.name }} - Roll {{ student.roll_number }}
+                <a href="{% url 'students:update' student.pk %}">Choose section</a></li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
 <div class="card shadow-sm">
     <div class="list-group list-group-flush">
         {% for student in students %}
