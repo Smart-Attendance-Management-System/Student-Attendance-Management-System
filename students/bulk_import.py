@@ -189,7 +189,7 @@ def import_students(uploaded_file):
                 continue
 
             try:
-                academic_class, section = _resolve_section(data, row_number)
+                _, section = _resolve_section(data, row_number)
             except BulkImportError as exc:
                 failures.append(
                     {"row_number": row_number, "reason": str(exc).split(": ", 1)[-1]}
@@ -199,7 +199,6 @@ def import_students(uploaded_file):
             form = StudentForm(
                 {
                     "name": data.get("name", ""),
-                    "student_class": str(academic_class),
                     "section": section.pk,
                     "roll_number": roll_number,
                     "contact_details": data.get("contact_details", ""),

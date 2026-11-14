@@ -321,7 +321,7 @@ def get_student_history(user, student_id, start_date_value=None, end_date_value=
             "id": student.pk,
             "name": student.name,
             "rollNumber": student.roll_number,
-            "className": student.student_class,
+            "className": student.class_name,
         },
         **calculate_attendance_summary([record.status for record in records]),
         "counts": counts,

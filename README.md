@@ -275,7 +275,13 @@ Admins can manage academic classes, sections, and subjects under:
 - `/subjects/`
 
 Sections belong to an academic class and cannot be deleted while students
-reference them. Every student profile must select a managed section.
+reference them. Every student profile must select a managed section, and the
+student's class is always taken from that section (there is no separate typed
+class name). When upgrading an existing database, migration
+`students.0005` places students without a section into one when their old
+class name matches a class that has exactly one section; otherwise it stops,
+lists those students and changes nothing, so give them a section first and
+run `migrate` again.
 ## Parent absence emails (REQ5.1)
 
 When a teacher marks a student **Absent** (on submission or by editing a

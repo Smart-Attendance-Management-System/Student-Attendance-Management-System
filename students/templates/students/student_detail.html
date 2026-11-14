@@ -8,7 +8,9 @@
         <h1 class="h2 card-title">{{ student.name }}</h1>
         <dl class="row">
             <dt class="col-sm-3">Class</dt>
-            <dd class="col-sm-9">{{ student.student_class }}</dd>
+            <dd class="col-sm-9">{{ student.class_name|default:"No section" }}</dd>
+            <dt class="col-sm-3">Section</dt>
+            <dd class="col-sm-9">{{ student.section.name|default:"None" }}</dd>
             <dt class="col-sm-3">Roll Number</dt>
             <dd class="col-sm-9">{{ student.roll_number }}</dd>
             <dt class="col-sm-3">Contact Details</dt>

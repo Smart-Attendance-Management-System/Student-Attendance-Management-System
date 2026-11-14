@@ -224,7 +224,7 @@ class MyAttendancePageTests(TestCase):
             academic_class=AcademicClass.objects.create(name="Grade 10"), name="A"
         )
         return Student.objects.create(
-            name=name, student_class="Grade 10", roll_number=1,
+            name=name, roll_number=1,
             contact_details="asha@example.com", section=section, parent=parent,
         )
 
@@ -293,7 +293,7 @@ class UsabilityCompatibilityTests(TestCase):
         section = Section.objects.create(academic_class=self.cls, name="A")
         self.students = [
             Student.objects.create(
-                name=f"Pupil {n}", student_class="Grade 6", roll_number=500 + n,
+                name=f"Pupil {n}", roll_number=500 + n,
                 contact_details="office", section=section,
             )
             for n in range(1, 4)
@@ -376,7 +376,7 @@ class TeacherDashboardTests(TestCase):
         section = Section.objects.create(academic_class=self.cls, name="A")
         self.students = [
             Student.objects.create(
-                name=f"Student {n}", student_class="Grade 10", roll_number=n,
+                name=f"Student {n}", roll_number=n,
                 contact_details=f"p{n}@example.com", section=section,
             )
             for n in (1, 2)
@@ -439,7 +439,7 @@ class PopupMessageTests(TestCase):
         self.cls = AcademicClass.objects.create(name="Grade 7", class_teacher=self.teacher)
         section = Section.objects.create(academic_class=self.cls, name="A")
         Student.objects.create(
-            name="Pupil", student_class="Grade 7", roll_number=1,
+            name="Pupil", roll_number=1,
             contact_details="office", section=section,
         )
 

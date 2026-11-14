@@ -58,7 +58,6 @@ def create_test_data(users, students_per_class):
             [
                 Student(
                     name=f"{CLASS_PREFIX} student {index:03d}-{n}",
-                    student_class=academic_class.name,
                     roll_number=first_roll + n,
                     contact_details=f"{username}-{n}@example.com",
                     section=section,

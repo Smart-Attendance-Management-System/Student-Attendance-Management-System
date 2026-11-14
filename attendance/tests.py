@@ -43,7 +43,6 @@ class AttendanceTestBase(TestCase):
         self.students = [
             Student.objects.create(
                 name=f"Student {n}",
-                student_class="Grade 10",
                 roll_number=n,
                 contact_details=f"parent{n}@example.com",
                 section=section,
@@ -181,7 +180,7 @@ class MarkAttendanceApiTests(AttendanceTestBase):
         other_cls = AcademicClass.objects.create(name="Grade 9", class_teacher=self.teacher)
         other_section = Section.objects.create(academic_class=other_cls, name="B")
         outsider = Student.objects.create(
-            name="Outsider", student_class="Grade 9", roll_number=99,
+            name="Outsider", roll_number=99,
             contact_details="x@example.com", section=other_section,
         )
         self.client.force_login(self.teacher)
@@ -418,7 +417,6 @@ class FiftyStudentSubmissionTests(AttendanceTestBase):
             [
                 Student(
                     name=f"{name} student {n}",
-                    student_class=name,
                     roll_number=first_roll + n,
                     contact_details=f"parent{first_roll + n}@example.com",
                     section=section,
@@ -541,7 +539,6 @@ class ScaleAndIndexTests(AttendanceTestBase):
                 [
                     Student(
                         name=f"Scale student {number}-{n}",
-                        student_class=academic_class.name,
                         roll_number=roll + n,
                         contact_details=f"scale{number}-{n}@example.com",
                         section=section,
@@ -609,7 +606,6 @@ class AttendanceSummaryApiTests(AttendanceTestBase):
         extra_section = Section.objects.create(academic_class=self.cls, name="B")
         extra_student = Student.objects.create(
             name="Student 4",
-            student_class="Grade 10",
             roll_number=4,
             contact_details="parent4@example.com",
             section=extra_section,
@@ -714,7 +710,6 @@ class AttendanceSummaryApiTests(AttendanceTestBase):
         other_section = Section.objects.create(academic_class=other_class, name="A")
         other_student = Student.objects.create(
             name="Other student",
-            student_class="Grade 9",
             roll_number=90,
             contact_details="other@example.com",
             section=other_section,
@@ -1018,7 +1013,7 @@ class StudentHistoryApiTests(AttendanceTestBase):
 
     def test_student_with_no_records_returns_zero_days(self):
         newcomer = Student.objects.create(
-            name="Newcomer", student_class="Grade 10", roll_number=50,
+            name="Newcomer", roll_number=50,
             contact_details="new@example.com", section=self.child.section,
             parent=self.parent,
         )

@@ -71,7 +71,6 @@ class CrossModuleFlowTests(TestCase):
                 reverse("students:create"),
                 {
                     "name": name,
-                    "student_class": "Class 10",
                     "section": section.pk,
                     "roll_number": roll,
                     "contact_details": f"parent{roll}@example.com",
