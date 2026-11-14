@@ -71,8 +71,12 @@ def student_create(request):
 @_admin_or_teacher_required
 @require_http_methods(["GET"])
 def student_list(request):
-    students = Student.objects.all()
-    return render(request, "students/student_list.html", {"students": students})
+    students = Student.objects.select_related("section__academic_class")
+    context = {"students": students}
+    if request.user.role == User.Role.ADMIN:
+        # Students without a section never appear on Mark attendance (issue #78).
+        context["students_without_section"] = students.filter(section__isnull=True)
+    return render(request, "students/student_list.html", context)
 
 
 @login_required(login_url="login")
