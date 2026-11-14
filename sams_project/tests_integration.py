@@ -1,6 +1,6 @@
 import json
 
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
 from accounts.models import User
@@ -14,6 +14,48 @@ DATE = "2026-10-26"
 
 def post_json(client, url, payload):
     return client.post(url, data=json.dumps(payload), content_type="application/json")
+
+
+@override_settings(DEBUG=False, ALLOWED_HOSTS=["testserver"])
+class ErrorPagesIntegrationTests(TestCase):
+    def setUp(self):
+        self.parent = User.objects.create_user(
+            "error-page-parent",
+            password=PASSWORD,
+            role=User.Role.STUDENT_PARENT,
+        )
+        self.client.force_login(self.parent)
+
+    def test_parent_sees_styled_403_on_blocked_admin_pages(self):
+        admin_pages = (
+            reverse("accounts:list"),
+            reverse("students:create"),
+            reverse("notifications:audit_log"),
+        )
+        for path in admin_pages:
+            with self.subTest(path=path):
+                response = self.client.get(path)
+
+                self.assertEqual(response.status_code, 403)
+                self.assertTemplateUsed(response, "pages/errors/403.html")
+                self.assertContains(response, "SAMS", status_code=403)
+                self.assertContains(response, "Access denied", status_code=403)
+                self.assertContains(response, "Logout", status_code=403)
+                self.assertContains(response, "Back to dashboard", status_code=403)
+                self.assertContains(
+                    response,
+                    reverse("pages:home"),
+                    status_code=403,
+                )
+
+    def test_not_found_page_uses_shared_layout(self):
+        response = self.client.get("/not-a-real-page/")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertTemplateUsed(response, "pages/errors/404.html")
+        self.assertContains(response, "SAMS", status_code=404)
+        self.assertContains(response, "Page not found", status_code=404)
+        self.assertContains(response, "Back to dashboard", status_code=404)
 
 
 class CrossModuleFlowTests(TestCase):
