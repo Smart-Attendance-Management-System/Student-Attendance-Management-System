@@ -3,7 +3,8 @@ import json
 from django.contrib import messages
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponseForbidden, JsonResponse
+from django.core.exceptions import PermissionDenied
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
@@ -16,7 +17,7 @@ def _admin_required(view_func):
     @login_required(login_url="login")
     def wrapped(request, *args, **kwargs):
         if not IsAdmin().has_permission(request, view_func):
-            return HttpResponseForbidden("Only admins can manage user accounts.")
+            raise PermissionDenied("Only admins can manage user accounts.")
         return view_func(request, *args, **kwargs)
 
     wrapped.__name__ = view_func.__name__
