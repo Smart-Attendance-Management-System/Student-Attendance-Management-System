@@ -466,3 +466,64 @@ class PopupMessageTests(TestCase):
         self.assertContains(response, 'class="toast border-0 border-start border-4 border-success"')
         self.assertContains(response, "User account deleted successfully.")
         self.assertNotContains(response, 'class="alert alert-info"')
+
+class MarkAttendanceClassListTests(TestCase):
+    """Issue #77: Mark attendance only offers the teacher's own classes."""
+
+    def setUp(self):
+        self.teacher = User.objects.create_user(
+            username="own-teacher", password="pass12345", role=User.Role.TEACHER
+        )
+        self.other_teacher = User.objects.create_user(
+            username="other-teacher", password="pass12345", role=User.Role.TEACHER
+        )
+        self.own_class = AcademicClass.objects.create(
+            name="Grade 7", class_teacher=self.teacher
+        )
+        self.other_class = AcademicClass.objects.create(
+            name="Grade 8", class_teacher=self.other_teacher
+        )
+        self.unassigned_class = AcademicClass.objects.create(name="Grade 9")
+        for academic_class in (self.own_class, self.other_class):
+            section = Section.objects.create(academic_class=academic_class, name="A")
+            Student.objects.create(
+                name=f"Pupil of {academic_class.name}",
+                student_class=academic_class.name,
+                roll_number=700 + academic_class.pk,
+                contact_details="office",
+                section=section,
+            )
+
+    def test_teacher_only_sees_their_own_classes_in_the_dropdown(self):
+        self.client.force_login(self.teacher)
+        response = self.client.get(reverse("pages:mark_attendance"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(list(response.context["classes"]), [self.own_class])
+        self.assertContains(response, f'value="{self.own_class.pk}"')
+        self.assertNotContains(response, f'value="{self.other_class.pk}"')
+        self.assertNotContains(response, f'value="{self.unassigned_class.pk}"')
+
+    def test_dropdown_matches_the_daily_view_page(self):
+        self.client.force_login(self.teacher)
+        mark = self.client.get(reverse("pages:mark_attendance"))
+        daily = self.client.get(reverse("pages:daily_attendance"))
+        self.assertEqual(list(mark.context["classes"]), list(daily.context["classes"]))
+
+    def test_another_teachers_class_cannot_be_opened_by_url(self):
+        self.client.force_login(self.teacher)
+        response = self.client.get(
+            reverse("pages:mark_attendance") + f"?class={self.other_class.pk}"
+        )
+
+        self.assertIsNone(response.context["selected"])
+        self.assertEqual(list(response.context["students"]), [])
+        self.assertNotContains(response, "Pupil of Grade 8")
+
+    def test_teacher_without_classes_sees_a_message(self):
+        lonely = User.objects.create_user(
+            username="no-class-teacher", password="pass12345", role=User.Role.TEACHER
+        )
+        self.client.force_login(lonely)
+        response = self.client.get(reverse("pages:mark_attendance"))
+        self.assertContains(response, "You are not the class teacher of any class yet.")
