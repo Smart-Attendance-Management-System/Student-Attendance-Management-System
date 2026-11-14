@@ -1,5 +1,6 @@
 import json
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import AnonymousUser
@@ -52,6 +53,33 @@ class LoginAPITests(TestCase):
             response.json()["session_token"], self.client.session.session_key
         )
         self.assertEqual(str(self.client.session["_auth_user_id"]), str(self.user.pk))
+
+    def test_switching_users_returns_the_new_session_token(self):
+        second_user = User.objects.create_user(
+            username="teacher2",
+            password="pass12345",
+            role=User.Role.TEACHER,
+        )
+
+        first_response = self.post_login("teacher1", "pass12345")
+        first_session_token = first_response.json()["session_token"]
+        self.assertTrue(first_session_token)
+
+        response = self.post_login("teacher2", "pass12345")
+
+        self.assertEqual(response.status_code, 200)
+        session_token = response.json()["session_token"]
+        self.assertTrue(session_token)
+        self.assertEqual(session_token, self.client.session.session_key)
+        self.assertEqual(
+            session_token,
+            response.cookies[settings.SESSION_COOKIE_NAME].value,
+        )
+        self.assertNotEqual(session_token, first_session_token)
+        self.assertEqual(
+            str(self.client.session["_auth_user_id"]),
+            str(second_user.pk),
+        )
 
     def test_successful_login_upgrades_legacy_password_hash_to_bcrypt(self):
         self.user.password = make_password("pass12345", hasher="pbkdf2_sha256")
