@@ -6,6 +6,8 @@ on:
 
 env:
   USE_SQLITE: "1"
+  DJANGO_DEBUG: "1"
+  DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1,testserver"
 
 jobs:
   build:
@@ -19,7 +21,19 @@ jobs:
       - name: Install requirements
         run: pip install -r requirements.txt
       - name: Django check
-        run: python manage.py check
+        run: |
+          export DJANGO_SECRET_KEY="$(python -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())')"
+          python manage.py check
+      - name: Django deployment check
+        env:
+          DJANGO_DEBUG: "0"
+          DJANGO_ALLOWED_HOSTS: "deployment.example.invalid"
+          SAMS_SMTP_HOST: "smtp.example.invalid"
+          SECURE_HSTS_INCLUDE_SUBDOMAINS: "1"
+          SECURE_HSTS_PRELOAD: "1"
+        run: |
+          export DJANGO_SECRET_KEY="$(python -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())')"
+          python manage.py check --deploy
 
   test:
     runs-on: ubuntu-latest
@@ -34,5 +48,6 @@ jobs:
         run: pip install -r requirements.txt
       - name: Run tests with coverage
         run: |
+          export DJANGO_SECRET_KEY="$(python -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())')"
           coverage run manage.py test
           coverage report
