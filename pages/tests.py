@@ -488,7 +488,6 @@ class MarkAttendanceClassListTests(TestCase):
             section = Section.objects.create(academic_class=academic_class, name="A")
             Student.objects.create(
                 name=f"Pupil of {academic_class.name}",
-                student_class=academic_class.name,
                 roll_number=700 + academic_class.pk,
                 contact_details="office",
                 section=section,
