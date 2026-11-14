@@ -141,8 +141,9 @@
         { headers: { "Accept": "application/octet-stream" } }
       );
       if (!response.ok) {
-        const data = await response.json();
-        showMessage("danger", data.message || "Could not export attendance summary.");
+        const data = await response.json().catch(() => ({}));
+        showMessage("danger", data.message || data.detail ||
+          "Could not export attendance summary (error " + response.status + ").");
         return;
       }
       const blob = await response.blob();
