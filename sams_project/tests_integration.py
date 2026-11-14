@@ -2,6 +2,7 @@ import json
 
 from django.test import Client, TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from accounts.models import User
 from attendance.models import Attendance
@@ -14,6 +15,68 @@ DATE = "2026-10-26"
 
 def post_json(client, url, payload):
     return client.post(url, data=json.dumps(payload), content_type="application/json")
+
+
+class AdminDashboardIntegrationTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            "dashboard-admin", password=PASSWORD, role=User.Role.ADMIN
+        )
+        teacher = User.objects.create_user(
+            "dashboard-teacher", password=PASSWORD, role=User.Role.TEACHER
+        )
+        User.objects.create_user(
+            "dashboard-parent", password=PASSWORD, role=User.Role.STUDENT_PARENT
+        )
+        marked_class = AcademicClass.objects.create(
+            name="Marked class", class_teacher=teacher
+        )
+        AcademicClass.objects.create(name="Needs attendance")
+        student = Student.objects.create(
+            name="Dashboard student",
+            student_class="Marked class",
+            roll_number=101,
+            contact_details="parent@example.com",
+        )
+        Attendance.objects.create(
+            student=student,
+            academic_class=marked_class,
+            date=timezone.localdate(),
+            status=Attendance.Status.PRESENT,
+            marked_by=teacher,
+        )
+
+    def test_admin_home_shows_counts_attendance_and_quick_links(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse("pages:home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["student_count"], 1)
+        self.assertEqual(response.context["class_count"], 2)
+        self.assertEqual(response.context["teacher_count"], 1)
+        self.assertEqual(response.context["parent_count"], 1)
+        self.assertContains(response, "Needs attendance")
+        self.assertNotContains(response, "Marked class")
+        self.assertContains(response, reverse("students:create"))
+        self.assertContains(response, reverse("students:import"))
+        self.assertContains(response, reverse("pages:attendance_summary"))
+
+    def test_non_admin_does_not_see_admin_dashboard(self):
+        teacher = User.objects.get(username="dashboard-teacher")
+        self.client.force_login(teacher)
+
+        response = self.client.get(reverse("pages:home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Your classes today")
+        self.assertNotContains(response, "School overview")
+
+        parent = User.objects.get(username="dashboard-parent")
+        self.client.force_login(parent)
+        response = self.client.get(reverse("pages:home"))
+        self.assertRedirects(
+            response, reverse("pages:my_attendance"), fetch_redirect_response=False
+        )
 
 
 class CrossModuleFlowTests(TestCase):
