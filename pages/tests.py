@@ -462,7 +462,7 @@ class PopupMessageTests(TestCase):
         response = self.client.post(
             reverse("accounts:delete", args=[other.pk]), follow=True
         )
-        self.assertContains(response, 'class="toast border-0 border-start border-4 border-success"')
+        self.assertContains(response, 'class="toast sams-toast sams-toast-success"')
         self.assertContains(response, "User account deleted successfully.")
         self.assertNotContains(response, 'class="alert alert-info"')
 
