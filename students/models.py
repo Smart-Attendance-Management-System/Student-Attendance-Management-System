@@ -114,10 +114,15 @@ class Student(models.Model):
         verbose_name = "student profile"
         verbose_name_plural = "student profiles"
 
+    MISSING_SECTION_MESSAGE = (
+        "Section is required. A student without a section does not appear on the Mark attendance page."
+    )
+
     def clean(self):
         super().clean()
-        if self.section:
-            self.student_class = str(self.section.academic_class)
+        if not self.section_id:
+            raise ValidationError({"section": self.MISSING_SECTION_MESSAGE})
+        self.student_class = str(self.section.academic_class)
         if not self.name or not self.name.strip():
             raise ValidationError({"name": "Student name is required."})
         if not self.student_class or not self.student_class.strip():

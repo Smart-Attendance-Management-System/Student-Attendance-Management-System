@@ -18,15 +18,14 @@ class StudentForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["student_class"].required = False
+        self.fields["section"].required = True
+        self.fields["section"].error_messages["required"] = Student.MISSING_SECTION_MESSAGE
 
     def clean(self):
         cleaned_data = super().clean()
         section = cleaned_data.get("section")
-        student_class = (cleaned_data.get("student_class") or "").strip()
         if section:
             cleaned_data["student_class"] = str(section.academic_class)
-        elif not student_class:
-            self.add_error("student_class", "Class or section is required.")
         return cleaned_data
 
 

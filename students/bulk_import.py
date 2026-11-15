@@ -13,8 +13,8 @@ from .models import AcademicClass, Section, Student
 
 MAX_UPLOAD_SIZE = 5 * 1024 * 1024
 SUPPORTED_SUFFIXES = {".csv", ".xlsx"}
-REQUIRED_COLUMNS = {"name", "class", "roll_number", "contact_details"}
-OPTIONAL_COLUMNS = {"section"}
+REQUIRED_COLUMNS = {"name", "class", "section", "roll_number", "contact_details"}
+OPTIONAL_COLUMNS = set()
 COLUMN_ALIASES = {
     "student_class": "class",
     "class_name": "class",
@@ -119,9 +119,7 @@ def _resolve_section(data, row_number):
     if academic_class is None:
         raise BulkImportError(f"Row {row_number}: class '{class_name}' was not found.")
 
-    section_name = data.get("section", "")
-    if not section_name:
-        return academic_class, None
+    section_name = data["section"]
     section = Section.objects.filter(
         academic_class=academic_class,
         name__iexact=section_name,
@@ -144,6 +142,7 @@ def import_students(uploaded_file):
         for field, label in (
             ("name", "name"),
             ("class", "class"),
+            ("section", "section"),
             ("roll_number", "roll number"),
             ("contact_details", "contact details"),
         ):
@@ -201,7 +200,7 @@ def import_students(uploaded_file):
                 {
                     "name": data.get("name", ""),
                     "student_class": str(academic_class),
-                    "section": section.pk if section else "",
+                    "section": section.pk,
                     "roll_number": roll_number,
                     "contact_details": data.get("contact_details", ""),
                 }
