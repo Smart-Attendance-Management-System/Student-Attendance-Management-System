@@ -170,11 +170,10 @@ class DailyPageAndNavigationTests(TestCase):
         self.assertContains(response, "Edit attendance")
         self.assertContains(response, 'id="editForm"')
 
-    def test_staff_user_sees_link_to_admin_site(self):
+    def test_admin_site_link_not_in_main_menu(self):
         self.client.force_login(self.make_user(User.Role.ADMIN, is_staff=True))
         response = self.client.get(reverse("students:list"))
-        self.assertContains(response, reverse("admin:index"))
-        self.assertContains(response, "Admin site")
+        self.assertNotContains(response, "Admin site")
 
     def test_login_page_links_to_admin_site(self):
         response = self.client.get(reverse("login"))
@@ -466,3 +465,80 @@ class PopupMessageTests(TestCase):
         self.assertContains(response, 'class="toast border-0 border-start border-4 border-success"')
         self.assertContains(response, "User account deleted successfully.")
         self.assertNotContains(response, 'class="alert alert-info"')
+
+
+
+class RoleMenuTests(TestCase):
+    """Each role sees only its own menu items, and nothing needs a typed URL."""
+
+    def menu_for(self, role):
+        user = User.objects.create_user(
+            username=role.lower(), password="pass12345", role=role
+        )
+        self.client.force_login(user)
+        html = self.client.get(reverse("pages:daily_attendance")
+                               if role != User.Role.STUDENT_PARENT
+                               else reverse("pages:my_attendance")).content.decode()
+        return html[html.index('<nav'):html.index('</nav>')]
+
+    def test_admin_menu(self):
+        nav = self.menu_for(User.Role.ADMIN)
+        for url in (
+            reverse("pages:home"),
+            reverse("students:list"),
+            reverse("students:create"),
+            reverse("students:import"),
+            reverse("classes:list"),
+            reverse("sections:list"),
+            reverse("accounts:list"),
+            reverse("pages:daily_attendance"),
+            reverse("pages:attendance_summary"),
+            reverse("notifications:audit_log"),
+        ):
+            self.assertIn(f'href="{url}"', nav)
+        self.assertNotIn(f'href="{reverse("pages:mark_attendance")}"', nav)
+        self.assertNotIn(reverse("subjects:list"), nav)
+
+    def test_teacher_menu(self):
+        nav = self.menu_for(User.Role.TEACHER)
+        for url in (
+            reverse("pages:home"),
+            reverse("pages:mark_attendance"),
+            reverse("pages:daily_attendance"),
+        ):
+            self.assertIn(f'href="{url}"', nav)
+        for url in (
+            reverse("students:list"),
+            reverse("accounts:list"),
+            reverse("notifications:audit_log"),
+            reverse("pages:attendance_summary"),
+        ):
+            self.assertNotIn(f'href="{url}"', nav)
+
+    def test_parent_menu(self):
+        nav = self.menu_for(User.Role.STUDENT_PARENT)
+        self.assertIn(f'href="{reverse("pages:my_attendance")}"', nav)
+        for url in (
+            reverse("pages:mark_attendance"),
+            reverse("pages:daily_attendance"),
+            reverse("students:list"),
+            reverse("accounts:list"),
+        ):
+            self.assertNotIn(f'href="{url}"', nav)
+
+    def test_current_page_is_highlighted(self):
+        nav = self.menu_for(User.Role.TEACHER)
+        self.assertIn(
+            f'class="nav-link active" href="{reverse("pages:daily_attendance")}"', nav
+        )
+
+class EditAttendanceModalOrderTests(TestCase):
+    """The edit popup must come before the page script, or Save changes does nothing."""
+
+    def test_edit_modal_is_above_the_script(self):
+        teacher = User.objects.create_user(
+            username="teacher1", password="pass12345", role=User.Role.TEACHER
+        )
+        self.client.force_login(teacher)
+        html = self.client.get(reverse("pages:daily_attendance")).content.decode()
+        self.assertLess(html.index('id="editModal"'), html.index("const BADGE"))

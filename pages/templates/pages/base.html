@@ -17,27 +17,56 @@
       <span class="navbar-toggler-icon"></span>
     </button>
     <div class="collapse navbar-collapse" id="mainNav">
+      {% with ns=request.resolver_match.namespace url=request.resolver_match.url_name %}
       <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-        {% if user.role == "TEACHER" %}
-        <li class="nav-item"><a class="nav-link" href="{% url 'pages:mark_attendance' %}">Mark attendance</a></li>
-        {% endif %}
-        {% if user.role == "ADMIN" or user.role == "TEACHER" %}
-        <li class="nav-item"><a class="nav-link" href="{% url 'pages:daily_attendance' %}">Daily view</a></li>
-        {% endif %}
+        <li class="nav-item">
+          <a class="nav-link{% if ns == 'pages' and url == 'home' %} active{% endif %}" href="{% url 'pages:home' %}">Dashboard</a>
+        </li>
         {% if user.role == "ADMIN" %}
-        <li class="nav-item"><a class="nav-link" href="{% url 'pages:attendance_summary' %}">Attendance summaries</a></li>
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle{% if ns == 'students' %} active{% endif %}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Students</a>
+          <ul class="dropdown-menu">
+            <li><a class="dropdown-item" href="{% url 'students:list' %}">All students</a></li>
+            <li><a class="dropdown-item" href="{% url 'students:create' %}">Add a student</a></li>
+            <li><a class="dropdown-item" href="{% url 'students:import' %}">Import from CSV</a></li>
+          </ul>
+        </li>
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle{% if ns == 'classes' or ns == 'sections' %} active{% endif %}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Classes</a>
+          <ul class="dropdown-menu">
+            <li><a class="dropdown-item" href="{% url 'classes:list' %}">Classes</a></li>
+            <li><a class="dropdown-item" href="{% url 'sections:list' %}">Sections</a></li>
+          </ul>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link{% if ns == 'accounts' %} active{% endif %}" href="{% url 'accounts:list' %}">Users</a>
+        </li>
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle{% if url == 'daily_attendance' or url == 'attendance_summary' %} active{% endif %}" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Reports</a>
+          <ul class="dropdown-menu">
+            <li><a class="dropdown-item" href="{% url 'pages:daily_attendance' %}">Daily view</a></li>
+            <li><a class="dropdown-item" href="{% url 'pages:attendance_summary' %}">Attendance summaries</a></li>
+          </ul>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link{% if url == 'audit_log' %} active{% endif %}" href="{% url 'notifications:audit_log' %}">Audit log</a>
+        </li>
+        {% endif %}
+        {% if user.role == "TEACHER" %}
+        <li class="nav-item">
+          <a class="nav-link{% if url == 'mark_attendance' %} active{% endif %}" href="{% url 'pages:mark_attendance' %}">Mark attendance</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link{% if url == 'daily_attendance' %} active{% endif %}" href="{% url 'pages:daily_attendance' %}">Daily view</a>
+        </li>
         {% endif %}
         {% if user.role == "STUDENT_PARENT" %}
-        <li class="nav-item"><a class="nav-link" href="{% url 'pages:my_attendance' %}">My attendance</a></li>
-        {% endif %}
-        {% if user.role == "ADMIN" %}
-        <li class="nav-item"><a class="nav-link" href="{% url 'accounts:list' %}">Manage Users</a></li>
-        <li class="nav-item"><a class="nav-link" href="{% url 'notifications:audit_log' %}">Audit log</a></li>
-        {% endif %}
-        {% if user.is_staff %}
-        <li class="nav-item"><a class="nav-link" href="{% url 'admin:index' %}">Admin site</a></li>
+        <li class="nav-item">
+          <a class="nav-link{% if url == 'my_attendance' %} active{% endif %}" href="{% url 'pages:my_attendance' %}">My attendance</a>
+        </li>
         {% endif %}
       </ul>
+      {% endwith %}
       <div class="d-flex flex-wrap align-items-center gap-2 text-white pb-2 pb-lg-0">
         <span class="small">{{ user.get_full_name|default:user.username }} &middot; {{ user.get_role_display }}</span>
         <form method="post" action="{% url 'pages:logout' %}" class="m-0">
