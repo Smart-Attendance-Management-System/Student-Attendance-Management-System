@@ -43,7 +43,6 @@ class AttendanceTestBase(TestCase):
         self.students = [
             Student.objects.create(
                 name=f"Student {n}",
-                student_class="Grade 10",
                 roll_number=n,
                 contact_details=f"parent{n}@example.com",
                 section=section,
@@ -181,7 +180,7 @@ class MarkAttendanceApiTests(AttendanceTestBase):
         other_cls = AcademicClass.objects.create(name="Grade 9", class_teacher=self.teacher)
         other_section = Section.objects.create(academic_class=other_cls, name="B")
         outsider = Student.objects.create(
-            name="Outsider", student_class="Grade 9", roll_number=99,
+            name="Outsider", roll_number=99,
             contact_details="x@example.com", section=other_section,
         )
         self.client.force_login(self.teacher)
@@ -418,7 +417,6 @@ class FiftyStudentSubmissionTests(AttendanceTestBase):
             [
                 Student(
                     name=f"{name} student {n}",
-                    student_class=name,
                     roll_number=first_roll + n,
                     contact_details=f"parent{first_roll + n}@example.com",
                     section=section,
@@ -541,7 +539,6 @@ class ScaleAndIndexTests(AttendanceTestBase):
                 [
                     Student(
                         name=f"Scale student {number}-{n}",
-                        student_class=academic_class.name,
                         roll_number=roll + n,
                         contact_details=f"scale{number}-{n}@example.com",
                         section=section,
@@ -609,7 +606,6 @@ class AttendanceSummaryApiTests(AttendanceTestBase):
         extra_section = Section.objects.create(academic_class=self.cls, name="B")
         extra_student = Student.objects.create(
             name="Student 4",
-            student_class="Grade 10",
             roll_number=4,
             contact_details="parent4@example.com",
             section=extra_section,
@@ -714,7 +710,6 @@ class AttendanceSummaryApiTests(AttendanceTestBase):
         other_section = Section.objects.create(academic_class=other_class, name="A")
         other_student = Student.objects.create(
             name="Other student",
-            student_class="Grade 9",
             roll_number=90,
             contact_details="other@example.com",
             section=other_section,
@@ -1018,7 +1013,7 @@ class StudentHistoryApiTests(AttendanceTestBase):
 
     def test_student_with_no_records_returns_zero_days(self):
         newcomer = Student.objects.create(
-            name="Newcomer", student_class="Grade 10", roll_number=50,
+            name="Newcomer", roll_number=50,
             contact_details="new@example.com", section=self.child.section,
             parent=self.parent,
         )
@@ -1101,3 +1096,67 @@ class DatabaseBackupCommandTests(TestCase):
             finally:
                 database.close()
             self.assertEqual(restored, "before")
+
+class ReportExportAcceptHeaderTests(AttendanceTestBase):
+    """The report pages send Accept: application/octet-stream (issue #76)."""
+
+    page_headers = {"HTTP_ACCEPT": "application/octet-stream"}
+
+    def export(self, report, file_format, **params):
+        return self.client.get(
+            f"/api/attendance/reports/{report}/{file_format}",
+            params,
+            **self.page_headers,
+        )
+
+    def assert_file(self, response, file_format):
+        self.assertEqual(response.status_code, 200, response.content[:200])
+        if file_format == "pdf":
+            self.assertEqual(response["Content-Type"], "application/pdf")
+            self.assertTrue(response.content.startswith(b"%PDF-"))
+        else:
+            self.assertEqual(
+                response["Content-Type"],
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+            load_workbook(BytesIO(response.content))
+
+    def test_every_report_page_downloads_for_each_allowed_role(self):
+        parent = User.objects.create_user(
+            username="accept-parent",
+            password="test-password",
+            role=User.Role.STUDENT_PARENT,
+        )
+        self.students[0].parent = parent
+        self.students[0].save()
+        services.mark_attendance(self.teacher, self.cls.pk, TODAY, [])
+
+        cases = [
+            (self.admin, "summary", {"startDate": TODAY, "endDate": TODAY}),
+            (self.admin, "daily", {"classId": self.cls.pk, "date": TODAY}),
+            (self.teacher, "daily", {"classId": self.cls.pk, "date": TODAY}),
+            (self.admin, "student", {"studentId": self.students[0].pk}),
+            (self.teacher, "student", {"studentId": self.students[0].pk}),
+            (parent, "student", {"studentId": self.students[0].pk}),
+        ]
+        for user, report, params in cases:
+            for file_format in ("pdf", "excel"):
+                with self.subTest(user=user.username, report=report, format=file_format):
+                    self.client.force_login(user)
+                    self.assert_file(self.export(report, file_format, **params), file_format)
+
+    def test_failed_export_returns_a_json_message_not_406(self):
+        self.client.force_login(self.teacher)
+        response = self.export("summary", "pdf", startDate=TODAY, endDate=TODAY)
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response["Content-Type"], "application/json")
+        self.assertEqual(response.json()["message"], "Only admins can export summaries.")
+
+        response = self.export("daily", "pdf", classId=self.cls.pk, date="not-a-date")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("message", response.json())
+
+    def test_logged_out_export_returns_a_json_error(self):
+        response = self.export("daily", "pdf", classId=self.cls.pk, date=TODAY)
+        self.assertIn(response.status_code, (401, 403))
+        self.assertIn("detail", response.json())

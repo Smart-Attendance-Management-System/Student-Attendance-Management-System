@@ -80,10 +80,6 @@ class Student(models.Model):
         max_length=120,
         help_text="Full name of the student.",
     )
-    student_class = models.CharField(
-        max_length=50,
-        help_text="Class or section assigned to the student.",
-    )
     roll_number = models.PositiveIntegerField(
         unique=True,
         help_text="Unique roll number for the student.",
@@ -110,22 +106,33 @@ class Student(models.Model):
     )
 
     class Meta:
-        ordering = ["student_class", "roll_number"]
+        ordering = ["section__academic_class__name", "section__name", "roll_number"]
         verbose_name = "student profile"
         verbose_name_plural = "student profiles"
 
+    MISSING_SECTION_MESSAGE = (
+        "Section is required. A student without a section does not appear on the Mark attendance page."
+    )
+
     def clean(self):
         super().clean()
-        if self.section:
-            self.student_class = str(self.section.academic_class)
+        if not self.section_id:
+            raise ValidationError({"section": self.MISSING_SECTION_MESSAGE})
         if not self.name or not self.name.strip():
             raise ValidationError({"name": "Student name is required."})
-        if not self.student_class or not self.student_class.strip():
-            raise ValidationError({"student_class": "Student class is required."})
         if self.roll_number is None or self.roll_number <= 0:
             raise ValidationError({"roll_number": "Roll number must be a positive number."})
         if not self.contact_details or not self.contact_details.strip():
             raise ValidationError({"contact_details": "Contact details are required."})
 
+    @property
+    def class_name(self):
+        """The student's class, always taken from their section."""
+        if self.section_id is None:
+            return ""
+        return self.section.academic_class.name
+
     def __str__(self):
-        return f"{self.name} ({self.student_class})"
+        if self.section_id is None:
+            return self.name
+        return f"{self.name} ({self.section})"

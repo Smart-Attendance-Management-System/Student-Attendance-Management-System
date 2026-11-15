@@ -9,25 +9,14 @@ User = get_user_model()
 class StudentForm(forms.ModelForm):
     class Meta:
         model = Student
-        fields = ("name", "student_class", "section", "roll_number", "contact_details")
-        labels = {"student_class": "Class"}
-        widgets = {
-            "student_class": forms.TextInput(attrs={"required": True}),
-        }
+        fields = ("name", "section", "roll_number", "contact_details")
+        labels = {"section": "Class and section"}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["student_class"].required = False
-
-    def clean(self):
-        cleaned_data = super().clean()
-        section = cleaned_data.get("section")
-        student_class = (cleaned_data.get("student_class") or "").strip()
-        if section:
-            cleaned_data["student_class"] = str(section.academic_class)
-        elif not student_class:
-            self.add_error("student_class", "Class or section is required.")
-        return cleaned_data
+        self.fields["section"].required = True
+        self.fields["section"].error_messages["required"] = Student.MISSING_SECTION_MESSAGE
+        self.fields["section"].queryset = Section.objects.select_related("academic_class")
 
 
 class AcademicClassForm(forms.ModelForm):

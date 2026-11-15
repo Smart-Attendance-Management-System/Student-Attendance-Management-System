@@ -1,5 +1,6 @@
 import json
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.decorators import login_required
@@ -108,6 +109,7 @@ def login_api(request):
         )
 
     login(request, user)
+    request.session.save()
     return JsonResponse(
         {
             "status": "success",

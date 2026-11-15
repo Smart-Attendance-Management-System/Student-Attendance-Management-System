@@ -13,7 +13,7 @@
       <label for="studentSelect" class="form-label">Student</label>
       <select id="studentSelect" class="form-select">
         {% for child in children %}
-          <option value="{{ child.pk }}">{{ child.name }} ({{ child.student_class }})</option>
+          <option value="{{ child.pk }}">{{ child.name }} ({{ child.class_name }})</option>
         {% endfor %}
       </select>
     </div>
@@ -133,8 +133,9 @@
           { headers: { "Accept": "application/octet-stream" } }
         );
         if (!response.ok) {
-          const data = await response.json();
-          result.replaceChildren(alertBox("danger", data.message || "Could not export attendance."));
+          const data = await response.json().catch(() => ({}));
+          result.replaceChildren(alertBox("danger", data.message || data.detail ||
+          "Could not export attendance (error " + response.status + ")."));
           return;
         }
         const blob = await response.blob();
