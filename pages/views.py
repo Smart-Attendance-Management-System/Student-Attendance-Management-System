@@ -39,7 +39,26 @@ def role_required(*roles):
 @login_required(login_url="login")
 def home(request):
     if request.user.role == User.Role.ADMIN:
-        return redirect("students:list")
+        today = timezone.localdate()
+        marked_class_ids = Attendance.objects.filter(date=today).values(
+            "academic_class_id"
+        )
+        return render(
+            request,
+            "pages/admin_dashboard.html",
+            {
+                "today": today,
+                "student_count": Student.objects.count(),
+                "class_count": AcademicClass.objects.count(),
+                "teacher_count": User.objects.filter(role=User.Role.TEACHER).count(),
+                "parent_count": User.objects.filter(
+                    role=User.Role.STUDENT_PARENT
+                ).count(),
+                "unmarked_classes": AcademicClass.objects.exclude(
+                    pk__in=marked_class_ids
+                ).order_by("name"),
+            },
+        )
     if request.user.role == User.Role.STUDENT_PARENT:
         return redirect("pages:my_attendance")
     return teacher_dashboard(request)
