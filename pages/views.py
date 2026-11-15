@@ -17,6 +17,14 @@ ROLE_PERMISSIONS = {
 }
 
 
+def permission_denied(request, exception):
+    return render(request, "pages/errors/403.html", status=403)
+
+
+def page_not_found(request, exception):
+    return render(request, "pages/errors/404.html", status=404)
+
+
 def role_required(*roles):
     """Login required; a user with the wrong role is sent to the home page."""
 

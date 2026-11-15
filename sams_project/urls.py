@@ -67,3 +67,6 @@ urlpatterns = [
     path('', include('notifications.urls')),
     path('', include(('pages.urls', 'pages'), namespace='pages')),
 ]
+
+handler403 = "pages.views.permission_denied"
+handler404 = "pages.views.page_not_found"

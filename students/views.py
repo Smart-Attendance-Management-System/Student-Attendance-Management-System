@@ -1,9 +1,9 @@
 from django.contrib import messages
 import logging
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
 from django.db import IntegrityError
 from django.db.models.deletion import ProtectedError
-from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods
 
@@ -21,7 +21,7 @@ def _admin_required(view_func):
         if not request.user.is_authenticated:
             return redirect("login")
         if not IsAdmin().has_permission(request, view_func):
-            return HttpResponseForbidden("Only admins can manage these records.")
+            raise PermissionDenied("Only admins can manage these records.")
         return view_func(request, *args, **kwargs)
 
     wrapped.__name__ = view_func.__name__
@@ -36,7 +36,7 @@ def _admin_or_teacher_required(view_func):
             IsAdmin().has_permission(request, view_func)
             or IsTeacher().has_permission(request, view_func)
         ):
-            return HttpResponseForbidden("Only admins and teachers can view students.")
+            raise PermissionDenied("Only admins and teachers can view students.")
         return view_func(request, *args, **kwargs)
 
     wrapped.__name__ = view_func.__name__
