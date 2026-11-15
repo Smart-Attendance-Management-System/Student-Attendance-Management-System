@@ -44,8 +44,10 @@ def role_required(*roles):
     return decorator
 
 
-@login_required(login_url="login")
 def home(request):
+    if not request.user.is_authenticated:
+        # Visitors who are not signed in see the welcome page with a Log in button
+        return render(request, "pages/landing.html")
     if request.user.role == User.Role.ADMIN:
         today = timezone.localdate()
         marked_class_ids = Attendance.objects.filter(date=today).values(

@@ -175,9 +175,9 @@ class DailyPageAndNavigationTests(TestCase):
         response = self.client.get(reverse("students:list"))
         self.assertNotContains(response, "Admin site")
 
-    def test_login_page_links_to_admin_site(self):
+    def test_login_page_has_no_admin_site_link(self):
         response = self.client.get(reverse("login"))
-        self.assertContains(response, reverse("admin:index"))
+        self.assertNotContains(response, reverse("admin:index"))
 
 
 class AttendanceSummaryPageTests(TestCase):
@@ -619,3 +619,24 @@ class MarkAttendanceDatePickerTests(TestCase):
         response = self.client.get(reverse("pages:mark_attendance") + f"?class={cls.pk}")
         today = timezone.localdate().isoformat()
         self.assertContains(response, f'max="{today}"')
+
+
+class LandingPageTests(TestCase):
+    """Visitors who are not signed in see a welcome page with a Log in button."""
+
+    def test_visitor_sees_landing_page_with_login_button(self):
+        response = self.client.get(reverse("pages:home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "pages/landing.html")
+        self.assertContains(response, f'href="{reverse("login")}"')
+        self.assertContains(response, "Accounts are created by your school admin")
+        self.assertNotContains(response, "Sign up")
+
+    def test_signed_in_user_goes_to_their_dashboard_instead(self):
+        teacher = User.objects.create_user(
+            username="teacher1", password="pass12345", role=User.Role.TEACHER
+        )
+        self.client.force_login(teacher)
+        response = self.client.get(reverse("pages:home"))
+        self.assertTemplateNotUsed(response, "pages/landing.html")
+        self.assertTemplateUsed(response, "pages/home.html")
