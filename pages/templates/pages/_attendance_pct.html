@@ -1,0 +1,6 @@
+{% if pct is None %}<span class="text-muted small">Not marked yet</span>{% else %}<div class="d-flex align-items-center gap-2" style="min-width: 140px;">
+  <div class="progress flex-grow-1" style="height: 8px; background: var(--sams-tint);" role="progressbar" aria-label="Attendance" aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100">
+    <div class="progress-bar" style="width: {{ pct }}%; background: {% if pct < 75 %}#b45309{% else %}var(--sams-accent){% endif %};"></div>
+  </div>
+  <span class="fw-bold small{% if pct < 75 %} text-warning-emphasis{% endif %}">{{ pct }}%</span>
+</div>{% endif %}

@@ -1,49 +1,108 @@
 {% extends "pages/base.html" %}
 
-{% block title %}Student Profiles - SAMS{% endblock %}
+{% block title %}Students - SAMS{% endblock %}
 
 {% block content %}
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
-    <h1 class="h2 mb-0">Student Profiles</h1>
-    {% if user.role == "ADMIN" %}
-    <div class="d-flex flex-wrap gap-2">
-        <a class="btn btn-outline-primary" href="{% url 'students:import' %}">Import Students</a>
-        <a class="btn btn-primary" href="{% url 'students:create' %}">Create Student</a>
-    </div>
-    {% endif %}
+  <div>
+    <h1 class="h2 mb-1">Students</h1>
+    <p class="text-muted mb-0">{{ students|length }} student{{ students|length|pluralize }}</p>
+  </div>
+  {% if user.role == "ADMIN" %}
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-outline-primary" href="{% url 'students:import' %}">Import from CSV</a>
+    <a class="btn btn-primary" href="{% url 'students:create' %}">Add a student</a>
+  </div>
+  {% endif %}
 </div>
+
 {% if students_without_section %}
 <div class="alert alert-warning" role="alert" id="students-without-section">
-    <h2 class="h5">{{ students_without_section|length }} student{{ students_without_section|length|pluralize }} without a section</h2>
-    <p>These students do not appear on the Mark attendance page. Edit each one and choose a section.</p>
-    <ul class="mb-0">
-        {% for student in students_without_section %}
-            <li>{{ student.name }} - Roll {{ student.roll_number }}
-                <a href="{% url 'students:update' student.pk %}">Choose section</a></li>
-        {% endfor %}
-    </ul>
+  <h2 class="h5">{{ students_without_section|length }} student{{ students_without_section|length|pluralize }} without a section</h2>
+  <p>These students do not appear on the Mark attendance page. Edit each one and choose a section.</p>
+  <ul class="mb-0">
+    {% for student in students_without_section %}
+      <li>{{ student.name }} - Roll {{ student.roll_number }}
+        <a href="{% url 'students:update' student.pk %}">Choose section</a></li>
+    {% endfor %}
+  </ul>
 </div>
 {% endif %}
-<div class="card shadow-sm">
-    <div class="list-group list-group-flush">
-        {% for student in students %}
-            <div class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2">
-                <span>{{ student.name }} - {{ student.class_name|default:"No section" }}{% if student.section %} ({{ student.section.name }}){% endif %} - Roll {{ student.roll_number }}</span>
-                {% if user.role == "ADMIN" %}
-                <div class="d-flex gap-2">
-                    <a class="btn btn-outline-secondary btn-sm" href="{% url 'students:detail' student.pk %}">View</a>
-                    <a class="btn btn-outline-secondary btn-sm" href="{% url 'students:update' student.pk %}">Edit</a>
-                    <form method="post" action="{% url 'students:delete' student.pk %}" class="m-0">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-outline-danger btn-sm"
-                                onclick="return confirm('Delete this student profile?')">Delete</button>
-                    </form>
-                </div>
-                {% endif %}
-            </div>
-        {% empty %}
-            <div class="list-group-item text-muted">No student profiles found.</div>
+
+<form method="get" class="card mb-3">
+  <div class="card-body row g-2 align-items-end">
+    <div class="col-12 col-md-4">
+      <label for="filterClass" class="form-label fw-bold small mb-1">Class</label>
+      <select id="filterClass" name="class" class="form-select" onchange="this.form.section && (this.form.section.value = ''); this.form.submit()">
+        <option value="">All classes</option>
+        {% for c in classes %}
+        <option value="{{ c.pk }}" {% if selected_class == c.pk|stringformat:"d" %}selected{% endif %}>{{ c.name }}</option>
         {% endfor %}
+      </select>
     </div>
+    {% if sections %}
+    <div class="col-12 col-md-3">
+      <label for="filterSection" class="form-label fw-bold small mb-1">Section</label>
+      <select id="filterSection" name="section" class="form-select" onchange="this.form.submit()">
+        <option value="">All sections</option>
+        {% for sec in sections %}
+        <option value="{{ sec.pk }}" {% if selected_section == sec.pk|stringformat:"d" %}selected{% endif %}>{{ sec.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    <div class="col-12 col-md-4">
+      <label for="sortBy" class="form-label fw-bold small mb-1">Sort by</label>
+      <select id="sortBy" name="sort" class="form-select" onchange="this.form.submit()">
+        {% for value, label in sort_options %}
+        <option value="{{ value }}" {% if sort == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-12 col-md-auto">
+      <noscript><button type="submit" class="btn btn-primary">Apply</button></noscript>
+      {% if selected_class or sort != "roll" %}<a class="fw-bold text-decoration-none ms-1" href="{% url 'students:list' %}">Clear</a>{% endif %}
+    </div>
+  </div>
+</form>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <thead>
+        <tr>
+          <th class="ps-4">Roll</th>
+          <th>Name</th>
+          <th>Class</th>
+          <th>Section</th>
+          <th>Attendance</th>
+          <th class="text-end pe-4">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for student in students %}
+        <tr>
+          <td class="ps-4">{{ student.roll_number }}</td>
+          <td class="fw-bold">{% if user.role == "ADMIN" %}<a class="text-decoration-none" href="{% url 'students:detail' student.pk %}">{{ student.name }}</a>{% else %}{{ student.name }}{% endif %}</td>
+          <td>{{ student.class_name|default:"No section" }}</td>
+          <td>{{ student.section.name|default:"-" }}</td>
+          <td>{% include "pages/_attendance_pct.html" with pct=student.percentage %}</td>
+          <td class="text-end pe-4 text-nowrap">
+            {% if user.role == "ADMIN" %}
+            <a class="btn btn-outline-secondary btn-sm" href="{% url 'students:detail' student.pk %}">View</a>
+            <a class="btn btn-outline-primary btn-sm" href="{% url 'students:update' student.pk %}">Edit</a>
+            <form method="post" action="{% url 'students:delete' student.pk %}" class="d-inline">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Delete this student profile?')">Delete</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="ps-4 text-muted">No students found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 {% endblock %}

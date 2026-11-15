@@ -65,7 +65,7 @@ class PageAccessTests(TestCase):
         )
         canonical_response = self.client.get(reverse("students:list"))
         self.assertEqual(canonical_response.status_code, 200)
-        self.assertContains(canonical_response, "Student Profiles")
+        self.assertContains(canonical_response, "<h1 class=\"h2 mb-1\">Students</h1>", html=True)
         self.assertNotContains(canonical_response, "Subjects")
 
     def test_header_shows_name_role_and_logout(self):
@@ -359,7 +359,7 @@ class UsabilityCompatibilityTests(TestCase):
         self.assertContains(response, 'class="table-responsive"')
         self.client.force_login(self.admin)
         response = self.client.get(reverse("students:list"))
-        self.assertContains(response, 'class="list-group list-group-flush"')
+        self.assertContains(response, 'class="table-responsive"')
 
 
 
@@ -548,13 +548,14 @@ class RoleMenuTests(TestCase):
             reverse("students:create"),
             reverse("students:import"),
             reverse("classes:list"),
-            reverse("sections:list"),
             reverse("accounts:list"),
             reverse("pages:daily_attendance"),
             reverse("pages:attendance_summary"),
             reverse("notifications:audit_log"),
         ):
             self.assertIn(f'href="{url}"', nav)
+        # Sections are reached through each class, so they have no menu item
+        self.assertNotIn(f'href="{reverse("sections:list")}"', nav)
         self.assertNotIn(f'href="{reverse("pages:mark_attendance")}"', nav)
         self.assertNotIn(reverse("subjects:list"), nav)
 

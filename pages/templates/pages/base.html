@@ -93,6 +93,17 @@
     .sams-toast-warning { background: #b45309; } .sams-toast-warning .sams-toast-icon { color: #b45309; }
     .sams-toast-danger { background: #b91c1c; } .sams-toast-danger .sams-toast-icon { color: #b91c1c; }
     .sams-toast-info { background: var(--sams-sidebar); } .sams-toast-info .sams-toast-icon { color: var(--sams-sidebar); }
+
+    /* Plain Django forms ({{ form.as_p }}) styled like the rest of the app */
+    form p > label { display: block; font-weight: 700; margin-bottom: 0.35rem; }
+    form p > input:not([type=checkbox]):not([type=radio]):not([type=hidden]), form p > select, form p > textarea {
+      display: block; width: 100%; max-width: 560px; padding: 0.5rem 0.75rem; border: 1px solid #dee2e6;
+      border-radius: 0.75rem; background: #ffffff; }
+    form p > textarea { height: 6rem; }
+    form p > input:focus, form p > select:focus, form p > textarea:focus {
+      outline: none; border-color: var(--sams-accent); box-shadow: 0 0 0 0.2rem rgba(15, 118, 110, 0.2); }
+    form p > .helptext { display: block; color: #6c757d; font-size: 0.875rem; margin-top: 0.25rem; }
+    form ul.errorlist { color: #b91c1c; padding-left: 1.1rem; margin-bottom: 0.35rem; }
   </style>
   {% block extra_head %}{% endblock %}
 </head>
@@ -123,10 +134,7 @@
       </li>
       <li class="sams-nav-group">School</li>
       <li class="nav-item sams-sub">
-        <a class="nav-link{% if ns == 'classes' %} active{% endif %}" href="{% url 'classes:list' %}">Classes</a>
-      </li>
-      <li class="nav-item sams-sub">
-        <a class="nav-link{% if ns == 'sections' %} active{% endif %}" href="{% url 'sections:list' %}">Sections</a>
+        <a class="nav-link{% if ns == 'classes' or ns == 'sections' %} active{% endif %}" href="{% url 'classes:list' %}">Classes</a>
       </li>
       <li class="nav-item sams-sub">
         <a class="nav-link{% if ns == 'accounts' %} active{% endif %}" href="{% url 'accounts:list' %}">Users</a>

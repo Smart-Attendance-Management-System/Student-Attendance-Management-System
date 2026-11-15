@@ -293,7 +293,9 @@ class CrossModuleFlowTests(TestCase):
             {"academic_class": academic_class.pk, "name": "A"},
         )
         self.assertRedirects(
-            response, reverse("sections:list"), fetch_redirect_response=False
+            response,
+            reverse("classes:detail", args=[academic_class.pk]),
+            fetch_redirect_response=False,
         )
         section = Section.objects.get(academic_class=academic_class, name="A")
 
