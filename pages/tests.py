@@ -65,7 +65,7 @@ class PageAccessTests(TestCase):
         )
         canonical_response = self.client.get(reverse("students:list"))
         self.assertEqual(canonical_response.status_code, 200)
-        self.assertContains(canonical_response, "Student Profiles")
+        self.assertContains(canonical_response, "<h1 class=\"h2 mb-1\">Students</h1>", html=True)
         self.assertNotContains(canonical_response, "Subjects")
 
     def test_header_shows_name_role_and_logout(self):
@@ -175,9 +175,9 @@ class DailyPageAndNavigationTests(TestCase):
         response = self.client.get(reverse("students:list"))
         self.assertNotContains(response, "Admin site")
 
-    def test_login_page_links_to_admin_site(self):
+    def test_login_page_has_no_admin_site_link(self):
         response = self.client.get(reverse("login"))
-        self.assertContains(response, reverse("admin:index"))
+        self.assertNotContains(response, reverse("admin:index"))
 
 
 class AttendanceSummaryPageTests(TestCase):
@@ -359,7 +359,7 @@ class UsabilityCompatibilityTests(TestCase):
         self.assertContains(response, 'class="table-responsive"')
         self.client.force_login(self.admin)
         response = self.client.get(reverse("students:list"))
-        self.assertContains(response, 'class="list-group list-group-flush"')
+        self.assertContains(response, 'class="table-responsive"')
 
 
 
@@ -462,7 +462,7 @@ class PopupMessageTests(TestCase):
         response = self.client.post(
             reverse("accounts:delete", args=[other.pk]), follow=True
         )
-        self.assertContains(response, 'class="toast border-0 border-start border-4 border-success"')
+        self.assertContains(response, 'class="toast sams-toast sams-toast-success"')
         self.assertContains(response, "User account deleted successfully.")
         self.assertNotContains(response, 'class="alert alert-info"')
 
@@ -548,13 +548,14 @@ class RoleMenuTests(TestCase):
             reverse("students:create"),
             reverse("students:import"),
             reverse("classes:list"),
-            reverse("sections:list"),
             reverse("accounts:list"),
             reverse("pages:daily_attendance"),
             reverse("pages:attendance_summary"),
             reverse("notifications:audit_log"),
         ):
             self.assertIn(f'href="{url}"', nav)
+        # Sections are reached through each class, so they have no menu item
+        self.assertNotIn(f'href="{reverse("sections:list")}"', nav)
         self.assertNotIn(f'href="{reverse("pages:mark_attendance")}"', nav)
         self.assertNotIn(reverse("subjects:list"), nav)
 
@@ -601,3 +602,42 @@ class EditAttendanceModalOrderTests(TestCase):
         self.client.force_login(teacher)
         html = self.client.get(reverse("pages:daily_attendance")).content.decode()
         self.assertLess(html.index('id="editModal"'), html.index("const BADGE"))
+
+
+class MarkAttendanceDatePickerTests(TestCase):
+    """Bug #101: the date picker does not offer future dates."""
+
+    def test_date_picker_stops_at_today(self):
+        teacher = User.objects.create_user(
+            username="teacher1", password="pass12345", role=User.Role.TEACHER
+        )
+        cls = AcademicClass.objects.create(name="Grade 9", class_teacher=teacher)
+        section = Section.objects.create(academic_class=cls, name="A")
+        Student.objects.create(
+            name="Pupil", roll_number=1, contact_details="office", section=section
+        )
+        self.client.force_login(teacher)
+        response = self.client.get(reverse("pages:mark_attendance") + f"?class={cls.pk}")
+        today = timezone.localdate().isoformat()
+        self.assertContains(response, f'max="{today}"')
+
+
+class LandingPageTests(TestCase):
+    """Visitors who are not signed in see a welcome page with a Log in button."""
+
+    def test_visitor_sees_landing_page_with_login_button(self):
+        response = self.client.get(reverse("pages:home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "pages/landing.html")
+        self.assertContains(response, f'href="{reverse("login")}"')
+        self.assertContains(response, "Accounts are created by your school admin")
+        self.assertNotContains(response, "Sign up")
+
+    def test_signed_in_user_goes_to_their_dashboard_instead(self):
+        teacher = User.objects.create_user(
+            username="teacher1", password="pass12345", role=User.Role.TEACHER
+        )
+        self.client.force_login(teacher)
+        response = self.client.get(reverse("pages:home"))
+        self.assertTemplateNotUsed(response, "pages/landing.html")
+        self.assertTemplateUsed(response, "pages/home.html")

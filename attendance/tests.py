@@ -13,6 +13,7 @@ from django.db import IntegrityError, connection
 from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
+from django.utils import timezone
 
 from accounts.models import User
 from notifications.models import AuditLog, Notification
@@ -107,6 +108,25 @@ class AttendanceServiceUnitTests(AttendanceTestBase):
 
 class MarkAttendanceApiTests(AttendanceTestBase):
     url = "/api/attendance"
+
+
+    def test_future_date_is_rejected_and_nothing_is_saved(self):
+        # Bug #101: attendance could be saved for dates that have not happened yet
+        tomorrow = (timezone.localdate() + datetime.timedelta(days=1)).isoformat()
+        self.client.force_login(self.teacher)
+        response = self.post_json(self.url, self.mark_payload(date=tomorrow))
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json()["message"], "Attendance cannot be marked for a future date."
+        )
+        self.assertEqual(Attendance.objects.count(), 0)
+
+    def test_today_is_still_allowed(self):
+        self.client.force_login(self.teacher)
+        response = self.post_json(
+            self.url, self.mark_payload(date=timezone.localdate().isoformat())
+        )
+        self.assertEqual(response.status_code, 201)    
 
     def test_teacher_marks_whole_class(self):  
         self.client.force_login(self.teacher)

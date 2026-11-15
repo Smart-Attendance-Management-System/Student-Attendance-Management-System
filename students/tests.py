@@ -186,8 +186,8 @@ class SharedLayoutIntegrationTests(TestCase):
             ("students:detail", (self.student.pk,), "students/student_detail.html"),
             ("students:create", (), "students/student_form.html"),
             ("students:import", (), "students/student_import.html"),
-            ("classes:list", (), "students/catalog_list.html"),
-            ("classes:detail", (self.academic_class.pk,), "students/catalog_detail.html"),
+            ("classes:list", (), "students/class_list.html"),
+            ("classes:detail", (self.academic_class.pk,), "students/class_detail.html"),
             ("classes:create", (), "students/catalog_form.html"),
         )
 
@@ -948,7 +948,9 @@ class ClassComesFromSectionTests(TestCase):
     def test_student_list_and_detail_show_the_class_from_the_section(self):
         self.client.force_login(self.admin)
         listing = self.client.get(reverse("students:list"))
-        self.assertContains(listing, "Mira Rao - Grade 4 (B) - Roll 401")
+        self.assertContains(listing, "Mira Rao")
+        self.assertContains(listing, "<td>Grade 4</td>", html=True)
+        self.assertContains(listing, "<td>B</td>", html=True)
         detail = self.client.get(reverse("students:detail", args=[self.student.pk]))
         self.assertContains(detail, '<dd class="col-sm-9">Grade 4</dd>', html=True)
         self.assertContains(detail, '<dd class="col-sm-9">B</dd>', html=True)
@@ -989,3 +991,141 @@ class ClassComesFromSectionTests(TestCase):
         imported = Student.objects.get(roll_number=403)
         self.assertEqual(imported.section, self.section_b)
         self.assertEqual(imported.class_name, "Grade 4")
+
+
+class StudentParentFieldTests(TestCase):
+    """Admins link a parent account to a student in the app, not only in the Django admin site."""
+
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            username="parent-field-admin", password="pass12345", role=User.Role.ADMIN
+        )
+        self.parent = User.objects.create_user(
+            username="parent-field-parent", password="pass12345", role=User.Role.STUDENT_PARENT
+        )
+        self.teacher = User.objects.create_user(
+            username="parent-field-teacher", password="pass12345", role=User.Role.TEACHER
+        )
+        cls = AcademicClass.objects.create(name="Grade 5")
+        self.section = Section.objects.create(academic_class=cls, name="A")
+        self.client.force_login(self.admin)
+
+    def test_form_offers_only_parent_accounts(self):
+        response = self.client.get(reverse("students:create"))
+        self.assertContains(response, "Parent account")
+        self.assertContains(response, "parent-field-parent")
+        self.assertNotContains(response, "parent-field-teacher")
+
+    def test_admin_links_a_parent_when_creating_a_student(self):
+        response = self.client.post(
+            reverse("students:create"),
+            {
+                "name": "Linked Pupil",
+                "section": self.section.pk,
+                "roll_number": 901,
+                "contact_details": "office",
+                "parent": self.parent.pk,
+            },
+        )
+        self.assertRedirects(response, reverse("students:list"))
+        self.assertEqual(Student.objects.get(roll_number=901).parent, self.parent)
+
+    def test_parent_is_optional(self):
+        self.client.post(
+            reverse("students:create"),
+            {"name": "No Parent", "section": self.section.pk, "roll_number": 902, "contact_details": "office"},
+        )
+        self.assertIsNone(Student.objects.get(roll_number=902).parent)
+
+
+class StudentListFilterSortTests(TestCase):
+    """Student list: filter by class and section, and sort by attendance %."""
+
+    def setUp(self):
+        from attendance.models import Attendance
+
+        self.admin = User.objects.create_user(
+            username="list-admin", password="pass12345", role=User.Role.ADMIN
+        )
+        self.teacher = User.objects.create_user(
+            username="list-teacher", password="pass12345", role=User.Role.TEACHER
+        )
+        self.grade6 = AcademicClass.objects.create(name="Grade 6", class_teacher=self.teacher)
+        self.grade7 = AcademicClass.objects.create(name="Grade 7")
+        self.six_a = Section.objects.create(academic_class=self.grade6, name="A")
+        self.six_b = Section.objects.create(academic_class=self.grade6, name="B")
+        seven_a = Section.objects.create(academic_class=self.grade7, name="A")
+        self.good = Student.objects.create(name="Good Attender", roll_number=1, contact_details="x", section=self.six_a)
+        self.poor = Student.objects.create(name="Poor Attender", roll_number=2, contact_details="x", section=self.six_b)
+        self.other = Student.objects.create(name="Other Class", roll_number=3, contact_details="x", section=seven_a)
+        # Good: 2 of 2 present (100%). Poor: 1 of 4 present (25%). Other: nothing marked.
+        days = ["2026-10-19", "2026-10-20", "2026-10-21", "2026-10-22"]
+        for day in days[:2]:
+            Attendance.objects.create(student=self.good, academic_class=self.grade6, date=day, status="Present")
+        for day, status in zip(days, ["Late", "Absent", "Absent", "Excused"]):
+            Attendance.objects.create(student=self.poor, academic_class=self.grade6, date=day, status=status)
+
+    def names(self, response):
+        return [s.name for s in response.context["students"]]
+
+    def test_filter_by_class_and_section(self):
+        self.client.force_login(self.admin)
+        url = reverse("students:list")
+        self.assertEqual(self.names(self.client.get(url, {"class": self.grade6.pk})), ["Good Attender", "Poor Attender"])
+        self.assertEqual(
+            self.names(self.client.get(url, {"class": self.grade6.pk, "section": self.six_b.pk})),
+            ["Poor Attender"],
+        )
+
+    def test_sort_by_attendance_percentage_both_ways(self):
+        self.client.force_login(self.admin)
+        url = reverse("students:list")
+        self.assertEqual(self.names(self.client.get(url, {"sort": "pct_high"})), ["Good Attender", "Poor Attender", "Other Class"])
+        self.assertEqual(self.names(self.client.get(url, {"sort": "pct_low"})), ["Poor Attender", "Good Attender", "Other Class"])
+
+    def test_list_shows_percentage(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse("students:list"))
+        self.assertContains(response, "100.0%")
+        self.assertContains(response, "25.0%")
+        self.assertContains(response, "Not marked yet")
+
+
+class ClassDrillDownTests(TestCase):
+    """Classes open their sections, and sections open their students."""
+
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            username="drill-admin", password="pass12345", role=User.Role.ADMIN
+        )
+        self.cls = AcademicClass.objects.create(name="Grade 8")
+        self.section = Section.objects.create(academic_class=self.cls, name="C")
+        Student.objects.create(name="Drill Pupil", roll_number=81, contact_details="x", section=self.section)
+        self.client.force_login(self.admin)
+
+    def test_class_list_shows_counts_and_links_to_class(self):
+        response = self.client.get(reverse("classes:list"))
+        self.assertContains(response, "1 section")
+        self.assertContains(response, "1 student")
+        self.assertContains(response, reverse("classes:detail", args=[self.cls.pk]))
+
+    def test_class_page_lists_sections_and_students(self):
+        response = self.client.get(reverse("classes:detail", args=[self.cls.pk]))
+        self.assertContains(response, "Section C")
+        self.assertContains(response, reverse("sections:detail", args=[self.section.pk]))
+        self.assertContains(response, "Drill Pupil")
+        self.assertContains(response, f'{reverse("sections:create")}?class={self.cls.pk}')
+
+    def test_section_page_lists_its_students(self):
+        response = self.client.get(reverse("sections:detail", args=[self.section.pk]))
+        self.assertContains(response, "Grade 8, section C")
+        self.assertContains(response, "Drill Pupil")
+
+    def test_add_section_from_class_page_prefills_and_returns_to_class(self):
+        form_page = self.client.get(reverse("sections:create"), {"class": self.cls.pk})
+        self.assertEqual(form_page.context["form"].initial["academic_class"], self.cls.pk)
+        response = self.client.post(reverse("sections:create"), {"academic_class": self.cls.pk, "name": "D"})
+        self.assertRedirects(response, reverse("classes:detail", args=[self.cls.pk]))
+
+    def test_old_sections_list_redirects_to_classes(self):
+        self.assertRedirects(self.client.get(reverse("sections:list")), reverse("classes:list"))
