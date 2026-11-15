@@ -142,6 +142,11 @@ def mark_attendance(teacher, class_id, date_value, records):
         )
         # Two submissions at the same moment: the database blocks the second one
         raise AttendanceError("Attendance already marked for this class and date.", 409)
+    entries = list(
+        Attendance.objects.filter(academic_class=academic_class, date=date)
+        .select_related("student")
+        .order_by("student__roll_number")
+    )
     logger.info(
         "Attendance submitted user_id=%s class_id=%s date=%s record_count=%s",
         teacher.pk,
