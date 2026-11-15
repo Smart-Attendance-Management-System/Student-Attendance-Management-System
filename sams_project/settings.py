@@ -123,7 +123,15 @@ WSGI_APPLICATION = 'sams_project.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.1/ref/settings/#databases
 
-if os.environ.get("USE_SQLITE") == "1":
+mysql_variables = ("DB_NAME", "DB_USER", "DB_PASSWORD")
+configured_mysql_variables = {
+    name: os.environ.get(name) for name in mysql_variables
+}
+mysql_is_configured = any(
+    value is not None for value in configured_mysql_variables.values()
+)
+
+if os.environ.get("USE_SQLITE") == "1" or not mysql_is_configured:
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
@@ -154,9 +162,9 @@ else:
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.mysql",
-            "NAME": os.environ.get("DB_NAME", "sams"),
-            "USER": os.environ.get("DB_USER", "root"),
-            "PASSWORD": os.environ.get("DB_PASSWORD", ""),
+            "NAME": configured_mysql_variables["DB_NAME"],
+            "USER": configured_mysql_variables["DB_USER"],
+            "PASSWORD": configured_mysql_variables["DB_PASSWORD"],
             "HOST": os.environ.get("DB_HOST", "localhost"),
             "PORT": os.environ.get("DB_PORT", "3306"),
         }
