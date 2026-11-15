@@ -25,12 +25,16 @@
   </div>
 </form>
 
+{% if not classes %}
+  <div class="alert alert-info">You are not the class teacher of any class yet.</div>
+{% endif %}
+
 {% if selected %}
   {% if students %}
   <div class="row g-2 mb-3 align-items-end">
     <div class="col-12 col-md-3">
       <label for="date" class="form-label">Date</label>
-      <input type="date" id="date" class="form-control" value="{{ today|date:'Y-m-d' }}">
+      <input type="date" id="date" class="form-control" value="{{ today|date:'Y-m-d' }}" max="{{ today|date:'Y-m-d' }}">
     </div>
     <div class="col-12 col-md-auto">
       <button type="button" id="markAll" class="btn btn-success">Mark All Present</button>

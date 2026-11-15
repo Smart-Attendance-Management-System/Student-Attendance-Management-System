@@ -1,7 +1,10 @@
 import json
+from urllib.parse import urlsplit
 
-from django.test import Client, TestCase
+from django.core import mail
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from accounts.models import User
 from attendance.models import Attendance
@@ -14,6 +17,235 @@ DATE = "2026-10-26"
 
 def post_json(client, url, payload):
     return client.post(url, data=json.dumps(payload), content_type="application/json")
+
+
+class PasswordResetIntegrationTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            "reset-password-user",
+            password=PASSWORD,
+            email="reset-password@example.com",
+            role=User.Role.STUDENT_PARENT,
+        )
+
+    def test_login_has_forgot_password_link(self):
+        response = self.client.get(reverse("login"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Forgot password?")
+        self.assertContains(response, reverse("password_reset"))
+        self.assertContains(response, "SAMS")
+
+    def test_reset_request_sends_email_and_uses_generic_confirmation(self):
+        reset_form = self.client.get(reverse("password_reset"))
+        self.assertTemplateUsed(
+            reset_form,
+            "pages/password_reset/form.html",
+        )
+        self.assertContains(reset_form, "Email address")
+        self.assertContains(reset_form, "SAMS")
+
+        response = self.client.post(
+            reverse("password_reset"),
+            {"email": self.user.email},
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("password_reset_done"),
+            fetch_redirect_response=False,
+        )
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [self.user.email])
+        self.assertIn("/accounts/reset/", mail.outbox[0].body)
+
+        known_email_page = self.client.get(response.url)
+        self.assertTemplateUsed(
+            known_email_page,
+            "pages/password_reset/done.html",
+        )
+        self.assertContains(
+            known_email_page,
+            "If an account exists for the email address you entered",
+        )
+        self.assertContains(known_email_page, "SAMS")
+
+        unknown_response = self.client.post(
+            reverse("password_reset"),
+            {"email": "not-registered@example.com"},
+        )
+        self.assertEqual(unknown_response["Location"], response.url)
+        unknown_email_page = self.client.get(unknown_response.url)
+        self.assertTemplateUsed(
+            unknown_email_page,
+            "pages/password_reset/done.html",
+        )
+        self.assertContains(
+            unknown_email_page,
+            "If an account exists for the email address you entered",
+        )
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_password_reset_link_sets_new_password_for_login(self):
+        self.client.post(
+            reverse("password_reset"),
+            {"email": self.user.email},
+        )
+        reset_url = next(
+            line.strip()
+            for line in mail.outbox[0].body.splitlines()
+            if line.strip().startswith("http://")
+        )
+        reset_path = urlsplit(reset_url).path
+        self.assertTrue(reset_path.startswith("/accounts/reset/"))
+
+        response = self.client.get(reset_path)
+        self.assertEqual(response.status_code, 302)
+        confirm_url = response["Location"]
+
+        confirm_page = self.client.get(confirm_url)
+        self.assertEqual(confirm_page.status_code, 200)
+        self.assertTemplateUsed(
+            confirm_page,
+            "pages/password_reset/confirm.html",
+        )
+        self.assertContains(confirm_page, "SAMS")
+
+        new_password = "A-new-secure-password-2026!"
+        response = self.client.post(
+            confirm_url,
+            {
+                "new_password1": new_password,
+                "new_password2": new_password,
+            },
+        )
+        self.assertRedirects(
+            response,
+            reverse("password_reset_complete"),
+            fetch_redirect_response=False,
+        )
+        complete_page = self.client.get(reverse("password_reset_complete"))
+        self.assertTemplateUsed(
+            complete_page,
+            "pages/password_reset/complete.html",
+        )
+        self.assertContains(complete_page, "SAMS")
+
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password(new_password))
+
+        response = self.client.post(
+            reverse("login"),
+            {"username": self.user.username, "password": new_password},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            str(self.client.session["_auth_user_id"]),
+            str(self.user.pk),
+        )
+        
+        
+@override_settings(DEBUG=False, ALLOWED_HOSTS=["testserver"])
+class ErrorPagesIntegrationTests(TestCase):
+    def setUp(self):
+        self.parent = User.objects.create_user(
+            "error-page-parent",
+            password=PASSWORD,
+            role=User.Role.STUDENT_PARENT,
+        )
+        self.client.force_login(self.parent)
+
+    def test_parent_sees_styled_403_on_blocked_admin_pages(self):
+        admin_pages = (
+            reverse("accounts:list"),
+            reverse("students:create"),
+            reverse("notifications:audit_log"),
+        )
+        for path in admin_pages:
+            with self.subTest(path=path):
+                response = self.client.get(path)
+
+                self.assertEqual(response.status_code, 403)
+                self.assertTemplateUsed(response, "pages/errors/403.html")
+                self.assertContains(response, "SAMS", status_code=403)
+                self.assertContains(response, "Access denied", status_code=403)
+                self.assertContains(response, "Logout", status_code=403)
+                self.assertContains(response, "Back to dashboard", status_code=403)
+                self.assertContains(
+                    response,
+                    reverse("pages:home"),
+                    status_code=403,
+                )
+
+    def test_not_found_page_uses_shared_layout(self):
+        response = self.client.get("/not-a-real-page/")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertTemplateUsed(response, "pages/errors/404.html")
+        self.assertContains(response, "SAMS", status_code=404)
+        self.assertContains(response, "Page not found", status_code=404)
+        self.assertContains(response, "Back to dashboard", status_code=404)
+        
+        
+class AdminDashboardIntegrationTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            "dashboard-admin", password=PASSWORD, role=User.Role.ADMIN
+        )
+        teacher = User.objects.create_user(
+            "dashboard-teacher", password=PASSWORD, role=User.Role.TEACHER
+        )
+        User.objects.create_user(
+            "dashboard-parent", password=PASSWORD, role=User.Role.STUDENT_PARENT
+        )
+        marked_class = AcademicClass.objects.create(
+            name="Marked class", class_teacher=teacher
+        )
+        AcademicClass.objects.create(name="Needs attendance")
+        student = Student.objects.create(
+            name="Dashboard student",
+            roll_number=101,
+            contact_details="parent@example.com",
+        )
+        Attendance.objects.create(
+            student=student,
+            academic_class=marked_class,
+            date=timezone.localdate(),
+            status=Attendance.Status.PRESENT,
+            marked_by=teacher,
+        )
+
+    def test_admin_home_shows_counts_attendance_and_quick_links(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse("pages:home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["student_count"], 1)
+        self.assertEqual(response.context["class_count"], 2)
+        self.assertEqual(response.context["teacher_count"], 1)
+        self.assertEqual(response.context["parent_count"], 1)
+        self.assertContains(response, "Needs attendance")
+        self.assertNotContains(response, "Marked class")
+        self.assertContains(response, reverse("students:create"))
+        self.assertContains(response, reverse("students:import"))
+        self.assertContains(response, reverse("pages:attendance_summary"))
+
+    def test_non_admin_does_not_see_admin_dashboard(self):
+        teacher = User.objects.get(username="dashboard-teacher")
+        self.client.force_login(teacher)
+
+        response = self.client.get(reverse("pages:home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Your classes today")
+        self.assertNotContains(response, "School overview")
+
+        parent = User.objects.get(username="dashboard-parent")
+        self.client.force_login(parent)
+        response = self.client.get(reverse("pages:home"))
+        self.assertRedirects(
+            response, reverse("pages:my_attendance"), fetch_redirect_response=False
+        )
 
 
 class CrossModuleFlowTests(TestCase):
@@ -61,7 +293,9 @@ class CrossModuleFlowTests(TestCase):
             {"academic_class": academic_class.pk, "name": "A"},
         )
         self.assertRedirects(
-            response, reverse("sections:list"), fetch_redirect_response=False
+            response,
+            reverse("classes:detail", args=[academic_class.pk]),
+            fetch_redirect_response=False,
         )
         section = Section.objects.get(academic_class=academic_class, name="A")
 
@@ -71,7 +305,6 @@ class CrossModuleFlowTests(TestCase):
                 reverse("students:create"),
                 {
                     "name": name,
-                    "student_class": "Class 10",
                     "section": section.pk,
                     "roll_number": roll,
                     "contact_details": f"parent{roll}@example.com",

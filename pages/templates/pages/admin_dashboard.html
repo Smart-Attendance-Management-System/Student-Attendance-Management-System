@@ -1,0 +1,64 @@
+{% extends "pages/base.html" %}
+{% block title %}School overview | SAMS{% endblock %}
+{% block content %}
+<div class="mb-4">
+  <h1 class="h4 mb-1">School overview</h1>
+  <p class="text-muted mb-0">Today is {{ today|date:"l, j F Y" }}</p>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <p class="text-muted mb-1">Students</p>
+        <p class="h3 mb-0">{{ student_count }}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <p class="text-muted mb-1">Classes</p>
+        <p class="h3 mb-0">{{ class_count }}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <p class="text-muted mb-1">Teachers</p>
+        <p class="h3 mb-0">{{ teacher_count }}</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <p class="text-muted mb-1">Parents</p>
+        <p class="h3 mb-0">{{ parent_count }}</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <h2 class="h5 mb-3">Classes that have not marked attendance today</h2>
+    {% if unmarked_classes %}
+    <ul class="list-group list-group-flush">
+      {% for academic_class in unmarked_classes %}
+      <li class="list-group-item px-0">{{ academic_class.name }}</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-muted mb-0">All classes have marked attendance today.</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="d-flex flex-wrap gap-2">
+  <a class="btn btn-primary" href="{% url 'students:create' %}">Add student</a>
+  <a class="btn btn-outline-primary" href="{% url 'students:import' %}">Import students</a>
+  <a class="btn btn-outline-secondary" href="{% url 'pages:attendance_summary' %}">View reports</a>
+</div>
+{% endblock %}

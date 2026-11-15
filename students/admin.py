@@ -23,6 +23,7 @@ class SubjectAdmin(admin.ModelAdmin):
 
 @admin.register(Student)
 class StudentAdmin(admin.ModelAdmin):
-    list_display = ("name", "student_class", "section", "roll_number", "parent", "contact_details")
-    search_fields = ("name", "student_class", "roll_number")
-    list_filter = ("student_class",)
+    list_display = ("name", "class_name", "section", "roll_number", "parent", "contact_details")
+    list_select_related = ("section__academic_class", "parent")
+    search_fields = ("name", "section__academic_class__name", "roll_number")
+    list_filter = ("section__academic_class",)

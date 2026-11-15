@@ -65,7 +65,7 @@ class PageAccessTests(TestCase):
         )
         canonical_response = self.client.get(reverse("students:list"))
         self.assertEqual(canonical_response.status_code, 200)
-        self.assertContains(canonical_response, "Student Profiles")
+        self.assertContains(canonical_response, "<h1 class=\"h2 mb-1\">Students</h1>", html=True)
         self.assertNotContains(canonical_response, "Subjects")
 
     def test_header_shows_name_role_and_logout(self):
@@ -170,15 +170,14 @@ class DailyPageAndNavigationTests(TestCase):
         self.assertContains(response, "Edit attendance")
         self.assertContains(response, 'id="editForm"')
 
-    def test_staff_user_sees_link_to_admin_site(self):
+    def test_admin_site_link_not_in_main_menu(self):
         self.client.force_login(self.make_user(User.Role.ADMIN, is_staff=True))
         response = self.client.get(reverse("students:list"))
-        self.assertContains(response, reverse("admin:index"))
-        self.assertContains(response, "Admin site")
+        self.assertNotContains(response, "Admin site")
 
-    def test_login_page_links_to_admin_site(self):
+    def test_login_page_has_no_admin_site_link(self):
         response = self.client.get(reverse("login"))
-        self.assertContains(response, reverse("admin:index"))
+        self.assertNotContains(response, reverse("admin:index"))
 
 
 class AttendanceSummaryPageTests(TestCase):
@@ -224,7 +223,7 @@ class MyAttendancePageTests(TestCase):
             academic_class=AcademicClass.objects.create(name="Grade 10"), name="A"
         )
         return Student.objects.create(
-            name=name, student_class="Grade 10", roll_number=1,
+            name=name, roll_number=1,
             contact_details="asha@example.com", section=section, parent=parent,
         )
 
@@ -293,7 +292,7 @@ class UsabilityCompatibilityTests(TestCase):
         section = Section.objects.create(academic_class=self.cls, name="A")
         self.students = [
             Student.objects.create(
-                name=f"Pupil {n}", student_class="Grade 6", roll_number=500 + n,
+                name=f"Pupil {n}", roll_number=500 + n,
                 contact_details="office", section=section,
             )
             for n in range(1, 4)
@@ -360,7 +359,7 @@ class UsabilityCompatibilityTests(TestCase):
         self.assertContains(response, 'class="table-responsive"')
         self.client.force_login(self.admin)
         response = self.client.get(reverse("students:list"))
-        self.assertContains(response, 'class="list-group list-group-flush"')
+        self.assertContains(response, 'class="table-responsive"')
 
 
 
@@ -376,7 +375,7 @@ class TeacherDashboardTests(TestCase):
         section = Section.objects.create(academic_class=self.cls, name="A")
         self.students = [
             Student.objects.create(
-                name=f"Student {n}", student_class="Grade 10", roll_number=n,
+                name=f"Student {n}", roll_number=n,
                 contact_details=f"p{n}@example.com", section=section,
             )
             for n in (1, 2)
@@ -439,7 +438,7 @@ class PopupMessageTests(TestCase):
         self.cls = AcademicClass.objects.create(name="Grade 7", class_teacher=self.teacher)
         section = Section.objects.create(academic_class=self.cls, name="A")
         Student.objects.create(
-            name="Pupil", student_class="Grade 7", roll_number=1,
+            name="Pupil", roll_number=1,
             contact_details="office", section=section,
         )
 
@@ -463,6 +462,182 @@ class PopupMessageTests(TestCase):
         response = self.client.post(
             reverse("accounts:delete", args=[other.pk]), follow=True
         )
-        self.assertContains(response, 'class="toast border-0 border-start border-4 border-success"')
+        self.assertContains(response, 'class="toast sams-toast sams-toast-success"')
         self.assertContains(response, "User account deleted successfully.")
         self.assertNotContains(response, 'class="alert alert-info"')
+
+class MarkAttendanceClassListTests(TestCase):
+    """Issue #77: Mark attendance only offers the teacher's own classes."""
+
+    def setUp(self):
+        self.teacher = User.objects.create_user(
+            username="own-teacher", password="pass12345", role=User.Role.TEACHER
+        )
+        self.other_teacher = User.objects.create_user(
+            username="other-teacher", password="pass12345", role=User.Role.TEACHER
+        )
+        self.own_class = AcademicClass.objects.create(
+            name="Grade 7", class_teacher=self.teacher
+        )
+        self.other_class = AcademicClass.objects.create(
+            name="Grade 8", class_teacher=self.other_teacher
+        )
+        self.unassigned_class = AcademicClass.objects.create(name="Grade 9")
+        for academic_class in (self.own_class, self.other_class):
+            section = Section.objects.create(academic_class=academic_class, name="A")
+            Student.objects.create(
+                name=f"Pupil of {academic_class.name}",
+                roll_number=700 + academic_class.pk,
+                contact_details="office",
+                section=section,
+            )
+
+    def test_teacher_only_sees_their_own_classes_in_the_dropdown(self):
+        self.client.force_login(self.teacher)
+        response = self.client.get(reverse("pages:mark_attendance"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(list(response.context["classes"]), [self.own_class])
+        self.assertContains(response, f'value="{self.own_class.pk}"')
+        self.assertNotContains(response, f'value="{self.other_class.pk}"')
+        self.assertNotContains(response, f'value="{self.unassigned_class.pk}"')
+
+    def test_dropdown_matches_the_daily_view_page(self):
+        self.client.force_login(self.teacher)
+        mark = self.client.get(reverse("pages:mark_attendance"))
+        daily = self.client.get(reverse("pages:daily_attendance"))
+        self.assertEqual(list(mark.context["classes"]), list(daily.context["classes"]))
+
+    def test_another_teachers_class_cannot_be_opened_by_url(self):
+        self.client.force_login(self.teacher)
+        response = self.client.get(
+            reverse("pages:mark_attendance") + f"?class={self.other_class.pk}"
+        )
+
+        self.assertIsNone(response.context["selected"])
+        self.assertEqual(list(response.context["students"]), [])
+        self.assertNotContains(response, "Pupil of Grade 8")
+
+    def test_teacher_without_classes_sees_a_message(self):
+        lonely = User.objects.create_user(
+            username="no-class-teacher", password="pass12345", role=User.Role.TEACHER
+        )
+        self.client.force_login(lonely)
+        response = self.client.get(reverse("pages:mark_attendance"))
+        self.assertContains(response, "You are not the class teacher of any class yet.")
+
+
+class RoleMenuTests(TestCase):
+    """Each role sees only its own menu items, and nothing needs a typed URL."""
+
+    def menu_for(self, role):
+        user = User.objects.create_user(
+            username=role.lower(), password="pass12345", role=role
+        )
+        self.client.force_login(user)
+        html = self.client.get(reverse("pages:daily_attendance")
+                               if role != User.Role.STUDENT_PARENT
+                               else reverse("pages:my_attendance")).content.decode()
+        return html[html.index('<nav'):html.index('</nav>')]
+
+    def test_admin_menu(self):
+        nav = self.menu_for(User.Role.ADMIN)
+        for url in (
+            reverse("pages:home"),
+            reverse("students:list"),
+            reverse("students:create"),
+            reverse("students:import"),
+            reverse("classes:list"),
+            reverse("accounts:list"),
+            reverse("pages:daily_attendance"),
+            reverse("pages:attendance_summary"),
+            reverse("notifications:audit_log"),
+        ):
+            self.assertIn(f'href="{url}"', nav)
+        # Sections are reached through each class, so they have no menu item
+        self.assertNotIn(f'href="{reverse("sections:list")}"', nav)
+        self.assertNotIn(f'href="{reverse("pages:mark_attendance")}"', nav)
+        self.assertNotIn(reverse("subjects:list"), nav)
+
+    def test_teacher_menu(self):
+        nav = self.menu_for(User.Role.TEACHER)
+        for url in (
+            reverse("pages:home"),
+            reverse("pages:mark_attendance"),
+            reverse("pages:daily_attendance"),
+        ):
+            self.assertIn(f'href="{url}"', nav)
+        for url in (
+            reverse("students:list"),
+            reverse("accounts:list"),
+            reverse("notifications:audit_log"),
+            reverse("pages:attendance_summary"),
+        ):
+            self.assertNotIn(f'href="{url}"', nav)
+
+    def test_parent_menu(self):
+        nav = self.menu_for(User.Role.STUDENT_PARENT)
+        self.assertIn(f'href="{reverse("pages:my_attendance")}"', nav)
+        for url in (
+            reverse("pages:mark_attendance"),
+            reverse("pages:daily_attendance"),
+            reverse("students:list"),
+            reverse("accounts:list"),
+        ):
+            self.assertNotIn(f'href="{url}"', nav)
+
+    def test_current_page_is_highlighted(self):
+        nav = self.menu_for(User.Role.TEACHER)
+        self.assertIn(
+            f'class="nav-link active" href="{reverse("pages:daily_attendance")}"', nav
+        )
+
+class EditAttendanceModalOrderTests(TestCase):
+    """The edit popup must come before the page script, or Save changes does nothing."""
+
+    def test_edit_modal_is_above_the_script(self):
+        teacher = User.objects.create_user(
+            username="teacher1", password="pass12345", role=User.Role.TEACHER
+        )
+        self.client.force_login(teacher)
+        html = self.client.get(reverse("pages:daily_attendance")).content.decode()
+        self.assertLess(html.index('id="editModal"'), html.index("const BADGE"))
+
+
+class MarkAttendanceDatePickerTests(TestCase):
+    """Bug #101: the date picker does not offer future dates."""
+
+    def test_date_picker_stops_at_today(self):
+        teacher = User.objects.create_user(
+            username="teacher1", password="pass12345", role=User.Role.TEACHER
+        )
+        cls = AcademicClass.objects.create(name="Grade 9", class_teacher=teacher)
+        section = Section.objects.create(academic_class=cls, name="A")
+        Student.objects.create(
+            name="Pupil", roll_number=1, contact_details="office", section=section
+        )
+        self.client.force_login(teacher)
+        response = self.client.get(reverse("pages:mark_attendance") + f"?class={cls.pk}")
+        today = timezone.localdate().isoformat()
+        self.assertContains(response, f'max="{today}"')
+
+
+class LandingPageTests(TestCase):
+    """Visitors who are not signed in see a welcome page with a Log in button."""
+
+    def test_visitor_sees_landing_page_with_login_button(self):
+        response = self.client.get(reverse("pages:home"))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "pages/landing.html")
+        self.assertContains(response, f'href="{reverse("login")}"')
+        self.assertContains(response, "Accounts are created by your school admin")
+        self.assertNotContains(response, "Sign up")
+
+    def test_signed_in_user_goes_to_their_dashboard_instead(self):
+        teacher = User.objects.create_user(
+            username="teacher1", password="pass12345", role=User.Role.TEACHER
+        )
+        self.client.force_login(teacher)
+        response = self.client.get(reverse("pages:home"))
+        self.assertTemplateNotUsed(response, "pages/landing.html")
+        self.assertTemplateUsed(response, "pages/home.html")

@@ -5,6 +5,7 @@ import logging
 
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Q
+from django.utils import timezone
 
 from accounts.models import User
 from notifications.services import log_attendance_edit, notify_absence, notify_absences
@@ -68,6 +69,14 @@ def mark_attendance(teacher, class_id, date_value, records):
         raise AttendanceError("You are not assigned to this class.", 403)
 
     date = parse_date(date_value)
+    if date > timezone.localdate():
+        logger.warning(
+            "Attendance submission rejected: future date user_id=%s class_id=%s date=%s",
+            teacher.pk,
+            academic_class.pk,
+            date,
+        )
+        raise AttendanceError("Attendance cannot be marked for a future date.", 400)
     if not isinstance(records, list):
         logger.warning(
             "Attendance submission rejected: records must be a list user_id=%s class_id=%s",
@@ -321,7 +330,7 @@ def get_student_history(user, student_id, start_date_value=None, end_date_value=
             "id": student.pk,
             "name": student.name,
             "rollNumber": student.roll_number,
-            "className": student.student_class,
+            "className": student.class_name,
         },
         **calculate_attendance_summary([record.status for record in records]),
         "counts": counts,

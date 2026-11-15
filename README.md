@@ -4,11 +4,16 @@
 
 1. Create and activate a virtual environment.
 2. Install dependencies from [requirements.txt](./requirements.txt).
+3. Configure the environment in the same PowerShell window (repeat this step
+   whenever you open a new window):
 3. Use SQLite for local runs (this is also the default when no complete
    `DB_NAME`, `DB_USER`, and `DB_PASSWORD` configuration is present):
 
 ```powershell
 $env:USE_SQLITE="1"
+$env:DJANGO_DEBUG="1"
+$env:DJANGO_SECRET_KEY = python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+$env:DJANGO_ALLOWED_HOSTS="localhost,127.0.0.1,testserver"
 ```
 
 4. Run migrations and start the server:
@@ -235,18 +240,41 @@ login. Student history access reuses `attendance.services.can_view_student`,
 so parents can only access children linked to their account; the integration
 test verifies a request for another parent's student returns HTTP 403.
 
-For deployment, terminate HTTPS at the application server or a trusted
-reverse proxy and configure:
+## Deployment configuration
 
-- `DJANGO_DEBUG=0`
-- `DJANGO_SECRET_KEY` to a unique secret held outside the repository
-- `DJANGO_ALLOWED_HOSTS` to a comma-separated list of deployment hostnames
-- `TRUST_X_FORWARDED_PROTO=1` only when a trusted proxy sets/replaces the
-  `X-Forwarded-Proto` header to `https`
+[.env.example](./.env.example) lists the settings used by the project. It is a
+reference only; Django does not load it automatically. Set deployment values
+in the service environment or a secret manager, and never commit a populated
+`.env` file.
+
+Set `DJANGO_DEBUG=0`, generate a unique `DJANGO_SECRET_KEY` with Django's
+`get_random_secret_key()`, and set `DJANGO_ALLOWED_HOSTS` to a comma-separated
+list of exact deployment hostnames. A missing key or host list, or a wildcard
+host, stops startup. For MySQL, set `DB_NAME`, `DB_USER`, and `DB_PASSWORD`;
+configure `SAMS_SMTP_HOST` and any required SMTP credentials because the
+console email backend is development-only.
 
 With `DJANGO_DEBUG=0`, HTTPS redirects, secure session/CSRF cookies, and
-one-year HSTS are enabled by default. Local development keeps these settings
-off unless explicitly enabled.
+one-year HSTS are enabled by default. Terminate HTTPS at the application
+server or a trusted reverse proxy. Set `TRUST_X_FORWARDED_PROTO=1` only when
+that proxy overwrites `X-Forwarded-Proto`. Set
+`SECURE_HSTS_INCLUDE_SUBDOMAINS=1` and `SECURE_HSTS_PRELOAD=1` only after
+confirming every subdomain uses HTTPS and you intend to opt into browser
+preloading.
+
+Run the deployment check with deployment-equivalent hostnames and SMTP
+settings. This placeholder setup is for validation only:
+
+```powershell
+$env:USE_SQLITE="1"
+$env:DJANGO_DEBUG="0"
+$env:DJANGO_SECRET_KEY = python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+$env:DJANGO_ALLOWED_HOSTS="deployment.example.invalid"
+$env:SAMS_SMTP_HOST="smtp.example.invalid"
+$env:SECURE_HSTS_INCLUDE_SUBDOMAINS="1"
+$env:SECURE_HSTS_PRELOAD="1"
+python manage.py check --deploy
+```
 
 ## User account management
 
@@ -276,8 +304,11 @@ Student profiles are managed under `/students/`.
 Only users with role `ADMIN` can create, update, or delete profiles.
 Admins can bulk import students from `/students/import/`.
 Imports accept UTF-8 `.csv` and `.xlsx` files up to 5 MB.
-Required columns are `name`, `class`, `roll_number`, and `contact_details`;
-`section` is optional and must belong to the specified class.
+Required columns are `name`, `class`, `section`, `roll_number`, and
+`contact_details`; the section must already exist in the specified class.
+Every student must have a section, because attendance finds students through
+their section. The student list shows admins any older students that still
+have no section, with a link to fix each one.
 Each data row is validated independently. Invalid rows are skipped and reported
 with their physical file row number (the header is row 1), while valid rows
 from the same file are saved. Structural file errors, such as missing required
@@ -332,8 +363,13 @@ Admins can manage academic classes, sections, and subjects under:
 - `/subjects/`
 
 Sections belong to an academic class and cannot be deleted while students
-reference them. Student profiles can select a managed section while retaining
-support for existing class values.
+reference them. Every student profile must select a managed section, and the
+student's class is always taken from that section (there is no separate typed
+class name). When upgrading an existing database, migration
+`students.0005` places students without a section into one when their old
+class name matches a class that has exactly one section; otherwise it stops,
+lists those students and changes nothing, so give them a section first and
+run `migrate` again.
 ## Parent absence emails (REQ5.1)
 
 When a teacher marks a student **Absent** (on submission or by editing a

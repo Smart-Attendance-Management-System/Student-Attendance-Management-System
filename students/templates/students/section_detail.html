@@ -1,0 +1,39 @@
+{% extends "pages/base.html" %}
+
+{% block title %}{{ section.academic_class.name }} {{ section.name }} - SAMS{% endblock %}
+
+{% block content %}
+<a class="d-inline-block mb-3 fw-bold text-decoration-none" href="{% url 'classes:detail' section.academic_class.pk %}">&larr; {{ section.academic_class.name }}</a>
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-4">
+  <div>
+    <h1 class="h2 mb-1">{{ section.academic_class.name }}, section {{ section.name }}</h1>
+    <p class="text-muted mb-0">{{ students|length }} student{{ students|length|pluralize }}</p>
+  </div>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-outline-primary" href="{% url 'sections:update' section.pk %}">Edit section</a>
+    <form method="post" action="{% url 'sections:delete' section.pk %}" class="m-0">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-outline-danger" onclick="return confirm('Delete this section?')">Delete section</button>
+    </form>
+  </div>
+</div>
+<div class="card">
+  <div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <thead><tr><th class="ps-4">Roll</th><th>Name</th><th>Parent</th><th class="pe-4">Attendance</th></tr></thead>
+      <tbody>
+        {% for student in students %}
+        <tr>
+          <td class="ps-4">{{ student.roll_number }}</td>
+          <td class="fw-bold"><a class="text-decoration-none" href="{% url 'students:detail' student.pk %}">{{ student.name }}</a></td>
+          <td>{% if student.parent %}{{ student.parent.get_full_name|default:student.parent.username }}{% else %}<span class="text-muted">-</span>{% endif %}</td>
+          <td class="pe-4">{% include "pages/_attendance_pct.html" with pct=student.percentage %}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="ps-4 text-muted">No students in this section yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

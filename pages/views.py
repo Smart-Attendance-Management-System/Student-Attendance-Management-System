@@ -17,6 +17,14 @@ ROLE_PERMISSIONS = {
 }
 
 
+def permission_denied(request, exception):
+    return render(request, "pages/errors/403.html", status=403)
+
+
+def page_not_found(request, exception):
+    return render(request, "pages/errors/404.html", status=404)
+
+
 def role_required(*roles):
     """Login required; a user with the wrong role is sent to the home page."""
 
@@ -36,10 +44,31 @@ def role_required(*roles):
     return decorator
 
 
-@login_required(login_url="login")
 def home(request):
+    if not request.user.is_authenticated:
+        # Visitors who are not signed in see the welcome page with a Log in button
+        return render(request, "pages/landing.html")
     if request.user.role == User.Role.ADMIN:
-        return redirect("students:list")
+        today = timezone.localdate()
+        marked_class_ids = Attendance.objects.filter(date=today).values(
+            "academic_class_id"
+        )
+        return render(
+            request,
+            "pages/admin_dashboard.html",
+            {
+                "today": today,
+                "student_count": Student.objects.count(),
+                "class_count": AcademicClass.objects.count(),
+                "teacher_count": User.objects.filter(role=User.Role.TEACHER).count(),
+                "parent_count": User.objects.filter(
+                    role=User.Role.STUDENT_PARENT
+                ).count(),
+                "unmarked_classes": AcademicClass.objects.exclude(
+                    pk__in=marked_class_ids
+                ).order_by("name"),
+            },
+        )
     if request.user.role == User.Role.STUDENT_PARENT:
         return redirect("pages:my_attendance")
     return teacher_dashboard(request)
@@ -77,7 +106,8 @@ def legacy_student_list(request):
 
 @role_required(User.Role.TEACHER)
 def mark_attendance(request):
-    classes = AcademicClass.objects.all()
+    # Same rule as the Daily view: a teacher only works with their own classes.
+    classes = AcademicClass.objects.filter(class_teacher=request.user)
     class_id = request.GET.get("class", "")
     selected = None
     students = []
@@ -130,5 +160,5 @@ def attendance_summary(request):
 @role_required(User.Role.STUDENT_PARENT)
 def my_attendance(request):
     """REQ4.2 screen: a parent sees the attendance history of their own children."""
-    children = request.user.children.order_by("name")
+    children = request.user.children.select_related("section__academic_class").order_by("name")
     return render(request, "pages/my_attendance.html", {"children": children})
