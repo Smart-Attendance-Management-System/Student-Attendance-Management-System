@@ -601,3 +601,21 @@ class EditAttendanceModalOrderTests(TestCase):
         self.client.force_login(teacher)
         html = self.client.get(reverse("pages:daily_attendance")).content.decode()
         self.assertLess(html.index('id="editModal"'), html.index("const BADGE"))
+
+
+class MarkAttendanceDatePickerTests(TestCase):
+    """Bug #101: the date picker does not offer future dates."""
+
+    def test_date_picker_stops_at_today(self):
+        teacher = User.objects.create_user(
+            username="teacher1", password="pass12345", role=User.Role.TEACHER
+        )
+        cls = AcademicClass.objects.create(name="Grade 9", class_teacher=teacher)
+        section = Section.objects.create(academic_class=cls, name="A")
+        Student.objects.create(
+            name="Pupil", roll_number=1, contact_details="office", section=section
+        )
+        self.client.force_login(teacher)
+        response = self.client.get(reverse("pages:mark_attendance") + f"?class={cls.pk}")
+        today = timezone.localdate().isoformat()
+        self.assertContains(response, f'max="{today}"')
