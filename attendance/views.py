@@ -5,7 +5,8 @@ from django.db import connection
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_GET, require_POST
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, content_negotiation_class, permission_classes
+from rest_framework.negotiation import BaseContentNegotiation
 from rest_framework.response import Response
 
 from accounts.models import User
@@ -113,7 +114,23 @@ def attendance_summary_api(request):
     return Response({"status": "success", **data})
 
 
+class FileDownloadNegotiation(BaseContentNegotiation):
+    """Ignore the Accept header for file downloads.
+
+    The report pages ask for ``application/octet-stream``. The file itself is a
+    plain HttpResponse, so only error messages go through DRF; those are always
+    sent as JSON so the page can show them, instead of failing with 406.
+    """
+
+    def select_parser(self, request, parsers):
+        return parsers[0] if parsers else None
+
+    def select_renderer(self, request, renderers, format_suffix=None):
+        return renderers[0], renderers[0].media_type
+
+
 @api_view(["GET"])
+@content_negotiation_class(FileDownloadNegotiation)
 @permission_classes([IsAdmin | IsTeacher | IsStudentParent])
 def attendance_report_export(request, report, file_format):
     """Download a displayed attendance report as Excel or PDF."""
