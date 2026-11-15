@@ -50,6 +50,36 @@ admin.site.site_url = "/accounts/login/"
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/auth/login', account_views.login_api, name='api_login'),
+    path(
+        'accounts/password_reset/',
+        auth_views.PasswordResetView.as_view(
+            template_name='pages/password_reset/form.html',
+            email_template_name='pages/password_reset/email.txt',
+            subject_template_name='pages/password_reset/subject.txt',
+        ),
+        name='password_reset',
+    ),
+    path(
+        'accounts/password_reset/done/',
+        auth_views.PasswordResetDoneView.as_view(
+            template_name='pages/password_reset/done.html',
+        ),
+        name='password_reset_done',
+    ),
+    path(
+        'accounts/reset/<uidb64>/<token>/',
+        auth_views.PasswordResetConfirmView.as_view(
+            template_name='pages/password_reset/confirm.html',
+        ),
+        name='password_reset_confirm',
+    ),
+    path(
+        'accounts/reset/done/',
+        auth_views.PasswordResetCompleteView.as_view(
+            template_name='pages/password_reset/complete.html',
+        ),
+        name='password_reset_complete',
+    ),
     path('accounts/', include(('accounts.urls', 'accounts'), namespace='accounts')),
     path('accounts/login/', auth_views.LoginView.as_view(), name='login'),
     path('students/', include(([
