@@ -34,7 +34,6 @@ class AdminDashboardIntegrationTests(TestCase):
         AcademicClass.objects.create(name="Needs attendance")
         student = Student.objects.create(
             name="Dashboard student",
-            student_class="Marked class",
             roll_number=101,
             contact_details="parent@example.com",
         )
