@@ -7,7 +7,7 @@
     <div class="card-body">
         <h1 class="h2 card-title">Import Students</h1>
         <p>Upload a UTF-8 CSV or .xlsx file no larger than 5 MB.</p>
-        <p>Required columns: name, class, roll_number, contact_details. Optional column: section.</p>
+        <p>Required columns: name, class, section, roll_number, contact_details. The section must already exist in the class.</p>
         {% if error %}
             <p class="alert alert-danger" role="alert">{{ error }}</p>
         {% endif %}

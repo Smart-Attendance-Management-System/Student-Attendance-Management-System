@@ -1,9 +1,9 @@
 from django.contrib import messages
 import logging
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
 from django.db import IntegrityError
 from django.db.models.deletion import ProtectedError
-from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods
 
@@ -21,7 +21,7 @@ def _admin_required(view_func):
         if not request.user.is_authenticated:
             return redirect("login")
         if not IsAdmin().has_permission(request, view_func):
-            return HttpResponseForbidden("Only admins can manage these records.")
+            raise PermissionDenied("Only admins can manage these records.")
         return view_func(request, *args, **kwargs)
 
     wrapped.__name__ = view_func.__name__
@@ -36,7 +36,7 @@ def _admin_or_teacher_required(view_func):
             IsAdmin().has_permission(request, view_func)
             or IsTeacher().has_permission(request, view_func)
         ):
-            return HttpResponseForbidden("Only admins and teachers can view students.")
+            raise PermissionDenied("Only admins and teachers can view students.")
         return view_func(request, *args, **kwargs)
 
     wrapped.__name__ = view_func.__name__
@@ -71,8 +71,12 @@ def student_create(request):
 @_admin_or_teacher_required
 @require_http_methods(["GET"])
 def student_list(request):
-    students = Student.objects.all()
-    return render(request, "students/student_list.html", {"students": students})
+    students = Student.objects.select_related("section__academic_class")
+    context = {"students": students}
+    if request.user.role == User.Role.ADMIN:
+        # Students without a section never appear on Mark attendance (issue #78).
+        context["students_without_section"] = students.filter(section__isnull=True)
+    return render(request, "students/student_list.html", context)
 
 
 @login_required(login_url="login")

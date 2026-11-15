@@ -6,7 +6,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.urls import reverse
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 
 from .models import AcademicClass, Section, Student, Subject
 
@@ -30,9 +30,12 @@ class StudentProfileTests(TestCase):
             password="test-password-123",
             role=User.Role.STUDENT_PARENT,
         )
+        self.grade_9 = AcademicClass.objects.create(name="Grade 9")
+        self.grade_9_a = Section.objects.create(academic_class=self.grade_9, name="A")
+        self.grade_11 = AcademicClass.objects.create(name="Grade 11")
+        self.grade_11_a = Section.objects.create(academic_class=self.grade_11, name="A")
         self.student = Student.objects.create(
             name="Alice Johnson",
-            student_class="Grade 10",
             roll_number=12,
             contact_details="alice@example.com / 555-0101",
         )
@@ -43,7 +46,7 @@ class StudentProfileTests(TestCase):
             reverse("students:create"),
             {
                 "name": "Bob Smith",
-                "student_class": "Grade 9",
+                "section": self.grade_9_a.pk,
                 "roll_number": 33,
                 "contact_details": "bob@example.com",
             },
@@ -65,7 +68,7 @@ class StudentProfileTests(TestCase):
             reverse("students:update", args=[self.student.pk]),
             {
                 "name": "Alice Updated",
-                "student_class": "Grade 11",
+                "section": self.grade_11_a.pk,
                 "roll_number": 12,
                 "contact_details": "alice.updated@example.com",
             },
@@ -86,7 +89,6 @@ class StudentProfileTests(TestCase):
             reverse("students:create"),
             {
                 "name": "Charlie Brown",
-                "student_class": "Grade 10",
                 "roll_number": 12,
                 "contact_details": "charlie@example.com",
             },
@@ -100,7 +102,6 @@ class StudentProfileTests(TestCase):
             reverse("students:create"),
             {
                 "name": "Denied User",
-                "student_class": "Grade 10",
                 "roll_number": 99,
                 "contact_details": "denied@example.com",
             },
@@ -111,7 +112,6 @@ class StudentProfileTests(TestCase):
             reverse("students:update", args=[self.student.pk]),
             {
                 "name": "Denied Edit",
-                "student_class": "Grade 10",
                 "roll_number": 12,
                 "contact_details": "denied@example.com",
             },
@@ -128,7 +128,6 @@ class StudentProfileTests(TestCase):
             reverse("students:create"),
             {
                 "name": "Denied User",
-                "student_class": "Grade 10",
                 "roll_number": 99,
                 "contact_details": "denied@example.com",
             },
@@ -147,7 +146,6 @@ class StudentProfileTests(TestCase):
             reverse("students:create"),
             {
                 "name": "",
-                "student_class": "",
                 "roll_number": "",
                 "contact_details": "",
             },
@@ -158,7 +156,6 @@ class StudentProfileTests(TestCase):
     def test_model_validates_required_fields(self):
         student = Student(
             name="",
-            student_class="",
             roll_number=0,
             contact_details="",
         )
@@ -177,7 +174,6 @@ class SharedLayoutIntegrationTests(TestCase):
         )
         self.student = Student.objects.create(
             name="Layout Student",
-            student_class="Grade 10",
             roll_number=101,
             contact_details="layout@example.com",
         )
@@ -395,7 +391,6 @@ class ClassSectionSubjectTests(TestCase):
         section = Section.objects.create(academic_class=academic_class, name="A")
         student = Student.objects.create(
             name="Section Student",
-            student_class=str(academic_class),
             section=section,
             roll_number=901,
             contact_details="student@example.com",
@@ -486,7 +481,7 @@ class BulkStudentImportTests(TestCase):
         self.assertEqual(response.status_code, 302)
         student = Student.objects.get(roll_number=101)
         self.assertEqual(student.section, self.section)
-        self.assertEqual(student.student_class, "Grade 10")
+        self.assertEqual(student.class_name, "Grade 10")
 
     def test_admin_can_import_supported_excel_file(self):
         self.client.force_login(self.admin)
@@ -527,7 +522,7 @@ class BulkStudentImportTests(TestCase):
             {
                 "file": SimpleUploadedFile(
                     "header-only.csv",
-                    b"name,class,roll_number,contact_details\n",
+                    b"name,class,section,roll_number,contact_details\n",
                     content_type="text/csv",
                 )
             },
@@ -611,7 +606,6 @@ class BulkStudentImportTests(TestCase):
     def test_duplicate_roll_numbers_are_skipped_and_reported(self):
         existing = Student.objects.create(
             name="Existing Student",
-            student_class="Grade 10",
             roll_number=104,
             contact_details="existing@example.com",
         )
@@ -761,3 +755,237 @@ class BulkStudentImportTests(TestCase):
         response = self.client.get(reverse("students:import"))
         self.assertEqual(response.status_code, 302)
         self.assertIn("/accounts/login", response["Location"])
+
+
+class StudentSectionRequiredTests(TestCase):
+    """Issue #78: every student needs a section so they appear in attendance."""
+
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            username="section-admin", password="adminpass123", role=User.Role.ADMIN
+        )
+        self.teacher = User.objects.create_user(
+            username="section-teacher", password="teacherpass123", role=User.Role.TEACHER
+        )
+        self.academic_class = AcademicClass.objects.create(
+            name="Grade 5", class_teacher=self.teacher
+        )
+        self.section = Section.objects.create(academic_class=self.academic_class, name="A")
+
+    def student_data(self, **overrides):
+        data = {
+            "name": "New Pupil",
+            "section": self.section.pk,
+            "roll_number": 501,
+            "contact_details": "parent@example.com",
+        }
+        data.update(overrides)
+        return data
+
+    def import_csv(self, content):
+        self.client.force_login(self.admin)
+        return self.client.post(
+            reverse("students:import"),
+            {"file": SimpleUploadedFile("students.csv", content, content_type="text/csv")},
+        )
+
+    def test_saving_a_student_without_a_section_fails_with_a_clear_error(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse("students:create"),
+            self.student_data(section=""),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, Student.MISSING_SECTION_MESSAGE)
+        self.assertFalse(Student.objects.filter(roll_number=501).exists())
+
+    def test_removing_the_section_from_an_existing_student_is_rejected(self):
+        student = Student.objects.create(
+            name="Pupil", roll_number=502,
+            contact_details="office", section=self.section,
+        )
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse("students:update", args=[student.pk]),
+            self.student_data(section="", roll_number=502),
+        )
+
+        self.assertContains(response, Student.MISSING_SECTION_MESSAGE)
+        student.refresh_from_db()
+        self.assertEqual(student.section, self.section)
+
+    def test_model_validation_requires_a_section(self):
+        student = Student(
+            name="Pupil", roll_number=503, contact_details="office"
+        )
+        with self.assertRaises(ValidationError) as caught:
+            student.full_clean()
+        self.assertEqual(
+            caught.exception.message_dict["section"], [Student.MISSING_SECTION_MESSAGE]
+        )
+
+    def test_student_saved_with_a_section_appears_on_mark_attendance(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(reverse("students:create"), self.student_data())
+        self.assertEqual(response.status_code, 302)
+        student = Student.objects.get(roll_number=501)
+        self.assertEqual(student.class_name, "Grade 5")
+
+        self.client.force_login(self.teacher)
+        page = self.client.get(
+            reverse("pages:mark_attendance"), {"class": self.academic_class.pk}
+        )
+        self.assertContains(page, "New Pupil")
+
+    def test_csv_row_without_a_section_is_rejected(self):
+        response = self.import_csv(
+            b"name,class,section,roll_number,contact_details\n"
+            b"No Section,Grade 5,,601,office\n"
+            b"Has Section,Grade 5,A,602,office\n"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Row 2: section is required.")
+        self.assertFalse(Student.objects.filter(roll_number=601).exists())
+        self.assertEqual(Student.objects.get(roll_number=602).section, self.section)
+
+    def test_csv_without_a_section_column_is_rejected(self):
+        response = self.import_csv(
+            b"name,class,roll_number,contact_details\nNo Section,Grade 5,603,office\n"
+        )
+
+        self.assertContains(
+            response, "Required columns are missing: section.", status_code=400
+        )
+        self.assertFalse(Student.objects.exists())
+
+    def test_admin_sees_existing_students_without_a_section(self):
+        orphan = Student.objects.create(
+            name="Orphan Pupil", roll_number=504,
+            contact_details="office",
+        )
+        Student.objects.create(
+            name="Placed Pupil", roll_number=505,
+            contact_details="office", section=self.section,
+        )
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse("students:list"))
+
+        self.assertEqual(list(response.context["students_without_section"]), [orphan])
+        self.assertContains(response, "1 student without a section")
+        self.assertContains(response, reverse("students:update", args=[orphan.pk]))
+
+    def test_section_warning_is_hidden_when_every_student_has_a_section(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse("students:list"))
+        self.assertNotContains(response, "without a section")
+
+    def test_teachers_do_not_see_the_admin_section_warning(self):
+        Student.objects.create(
+            name="Orphan Pupil", roll_number=506,
+            contact_details="office",
+        )
+        self.client.force_login(self.teacher)
+        response = self.client.get(reverse("students:list"))
+        self.assertNotContains(response, "without a section")
+
+
+class ClassComesFromSectionTests(TestCase):
+    """Issue #80: the class is always taken from the student's section."""
+
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            username="class-admin", password="adminpass123", role=User.Role.ADMIN
+        )
+        self.teacher = User.objects.create_user(
+            username="class-teacher", password="teacherpass123", role=User.Role.TEACHER
+        )
+        self.parent = User.objects.create_user(
+            username="class-parent", password="parentpass123", role=User.Role.STUDENT_PARENT
+        )
+        self.grade_4 = AcademicClass.objects.create(name="Grade 4", class_teacher=self.teacher)
+        self.section_b = Section.objects.create(academic_class=self.grade_4, name="B")
+        self.student = Student.objects.create(
+            name="Mira Rao",
+            roll_number=401,
+            contact_details="office",
+            section=self.section_b,
+            parent=self.parent,
+        )
+
+    def test_form_and_model_no_longer_have_a_typed_class_field(self):
+        from .forms import StudentForm
+
+        self.assertNotIn("student_class", StudentForm().fields)
+        self.assertNotIn("student_class", [f.name for f in Student._meta.get_fields()])
+        self.client.force_login(self.admin)
+        page = self.client.get(reverse("students:create"))
+        self.assertNotContains(page, 'name="student_class"')
+
+    def test_typed_class_sent_by_a_form_post_is_ignored(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse("students:create"),
+            {
+                "name": "New Pupil",
+                "student_class": "Grade 99",
+                "section": self.section_b.pk,
+                "roll_number": 402,
+                "contact_details": "office",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Student.objects.get(roll_number=402).class_name, "Grade 4")
+
+    def test_moving_section_changes_the_class_everywhere(self):
+        grade_5 = AcademicClass.objects.create(name="Grade 5")
+        section = Section.objects.create(academic_class=grade_5, name="A")
+        self.student.section = section
+        self.student.save()
+        self.assertEqual(self.student.class_name, "Grade 5")
+
+    def test_student_list_and_detail_show_the_class_from_the_section(self):
+        self.client.force_login(self.admin)
+        listing = self.client.get(reverse("students:list"))
+        self.assertContains(listing, "Mira Rao - Grade 4 (B) - Roll 401")
+        detail = self.client.get(reverse("students:detail", args=[self.student.pk]))
+        self.assertContains(detail, '<dd class="col-sm-9">Grade 4</dd>', html=True)
+        self.assertContains(detail, '<dd class="col-sm-9">B</dd>', html=True)
+
+    def test_reports_show_the_class_from_the_section(self):
+        self.client.force_login(self.parent)
+        history = self.client.get(f"/api/attendance/student/{self.student.pk}")
+        self.assertEqual(history.json()["student"]["className"], "Grade 4")
+
+        workbook = load_workbook(
+            BytesIO(
+                self.client.get(
+                    "/api/attendance/reports/student/excel",
+                    {"studentId": self.student.pk},
+                ).content
+            )
+        )
+        rows = list(workbook["Attendance history"].iter_rows(values_only=True))
+        self.assertIn(("Class", "Grade 4"), [row[:2] for row in rows])
+
+        my_page = self.client.get(reverse("pages:my_attendance"))
+        self.assertContains(my_page, "Mira Rao (Grade 4)")
+
+    def test_csv_import_takes_the_class_from_the_section(self):
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            reverse("students:import"),
+            {
+                "file": SimpleUploadedFile(
+                    "students.csv",
+                    b"name,class,section,roll_number,contact_details\n"
+                    b"Imported Pupil,grade 4,b,403,office\n",
+                    content_type="text/csv",
+                )
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        imported = Student.objects.get(roll_number=403)
+        self.assertEqual(imported.section, self.section_b)
+        self.assertEqual(imported.class_name, "Grade 4")
