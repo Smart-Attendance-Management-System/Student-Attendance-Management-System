@@ -23,19 +23,27 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get("DJANGO_DEBUG", "1") == "1"
+DEBUG = os.environ.get("DJANGO_DEBUG", "0") == "1"
 
-SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY")
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "").strip()
 if not SECRET_KEY:
-    if not DEBUG:
-        raise ImproperlyConfigured("DJANGO_SECRET_KEY must be configured outside development.")
-    SECRET_KEY = "django-insecure-bgpn_z118dgb&ulkaa)6_k6892%*3%mu1cz42xoe7x*p^p8hy7"
+    raise ImproperlyConfigured(
+        "DJANGO_SECRET_KEY must be configured in the environment."
+    )
 
 ALLOWED_HOSTS = [
     host.strip()
     for host in os.environ.get("DJANGO_ALLOWED_HOSTS", "").split(",")
     if host.strip()
 ]
+if not DEBUG and not ALLOWED_HOSTS:
+    raise ImproperlyConfigured(
+        "DJANGO_ALLOWED_HOSTS must list the deployment hostnames when DEBUG is off."
+    )
+if not DEBUG and "*" in ALLOWED_HOSTS:
+    raise ImproperlyConfigured(
+        "DJANGO_ALLOWED_HOSTS must not contain '*' when DEBUG is off."
+    )
 
 PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.BCryptSHA256PasswordHasher",
@@ -59,6 +67,7 @@ SECURE_HSTS_SECONDS = int(
 SECURE_HSTS_INCLUDE_SUBDOMAINS = (
     os.environ.get("SECURE_HSTS_INCLUDE_SUBDOMAINS", "0") == "1"
 )
+SECURE_HSTS_PRELOAD = os.environ.get("SECURE_HSTS_PRELOAD", "0") == "1"
 
 if os.environ.get("TRUST_X_FORWARDED_PROTO") == "1":
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
@@ -128,7 +137,19 @@ if os.environ.get("USE_SQLITE") == "1":
         }
     }
 else:
+    if not DEBUG:
+        missing_database_settings = [
+            setting
+            for setting in ("DB_NAME", "DB_USER", "DB_PASSWORD")
+            if not os.environ.get(setting, "").strip()
+        ]
+        if missing_database_settings:
+            raise ImproperlyConfigured(
+                "Set DB_NAME, DB_USER, and DB_PASSWORD when using MySQL "
+                "outside DEBUG mode."
+            )
     import pymysql
+
     pymysql.install_as_MySQLdb()
     DATABASES = {
         "default": {
@@ -201,12 +222,16 @@ if SMTP_HOST:
             },
         },
     }
-else:
+elif DEBUG:
     MAILERS = {
         'default': {
             'BACKEND': 'django.core.mail.backends.console.EmailBackend',
         },
     }
+else:
+    raise ImproperlyConfigured(
+        "SAMS_SMTP_HOST must be configured outside DEBUG mode."
+    )
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "SAMS <no-reply@sams.local>")
 
 AUTH_USER_MODEL = "accounts.User"
