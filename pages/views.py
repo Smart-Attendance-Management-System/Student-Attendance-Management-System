@@ -77,7 +77,8 @@ def legacy_student_list(request):
 
 @role_required(User.Role.TEACHER)
 def mark_attendance(request):
-    classes = AcademicClass.objects.all()
+    # Same rule as the Daily view: a teacher only works with their own classes.
+    classes = AcademicClass.objects.filter(class_teacher=request.user)
     class_id = request.GET.get("class", "")
     selected = None
     students = []
