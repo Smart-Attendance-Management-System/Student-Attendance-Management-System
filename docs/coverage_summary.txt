@@ -1,0 +1,2 @@
+Code (line) coverage: 96%%
+Branch coverage: 81%%
