@@ -1,0 +1,584 @@
+Creating test database for alias 'default' ('file:memorydb_default?mode=memory&cache=shared')...
+Found 257 test(s).
+Operations to perform:
+  Synchronize unmigrated apps: messages, rest_framework, staticfiles
+  Apply all migrations: accounts, admin, attendance, auth, contenttypes, notifications, sessions, students
+Synchronizing apps without migrations:
+  Creating tables...
+    Running deferred SQL...
+Running migrations:
+  Applying contenttypes.0001_initial... OK
+  Applying contenttypes.0002_remove_content_type_name... OK
+  Applying auth.0001_initial... OK
+  Applying auth.0002_alter_permission_name_max_length... OK
+  Applying auth.0003_alter_user_email_max_length... OK
+  Applying auth.0004_alter_user_username_opts... OK
+  Applying auth.0005_alter_user_last_login_null... OK
+  Applying auth.0006_require_contenttypes_0002... OK
+  Applying auth.0007_alter_validators_add_error_messages... OK
+  Applying auth.0008_alter_user_username_max_length... OK
+  Applying auth.0009_alter_user_last_name_max_length... OK
+  Applying auth.0010_alter_group_name_max_length... OK
+  Applying auth.0011_update_proxy_permissions... OK
+  Applying auth.0012_alter_user_first_name_max_length... OK
+  Applying accounts.0001_initial... OK
+  Applying admin.0001_initial... OK
+  Applying admin.0002_logentry_remove_auto_add... OK
+  Applying admin.0003_logentry_add_action_flag_choices... OK
+  Applying students.0001_initial... OK
+  Applying students.0002_academicclass_subject_section_student_section_and_more... OK
+  Applying students.0003_academicclass_class_teacher... OK
+  Applying attendance.0001_initial... OK
+  Applying attendance.0002_attendance_class_date_index... OK
+  Applying students.0004_student_parent... OK
+  Applying notifications.0001_initial... OK
+  Applying notifications.0002_notification... OK
+  Applying notifications.0003_notification_retries... OK
+  Applying sessions.0001_initial... OK
+  Applying students.0005_remove_student_student_class...test_successful_login_returns_role_and_session_token (accounts.tests.LoginAPITests.test_successful_login_returns_role_and_session_token) ... ok
+test_successful_login_upgrades_legacy_password_hash_to_bcrypt (accounts.tests.LoginAPITests.test_successful_login_upgrades_legacy_password_hash_to_bcrypt) ... ok
+test_switching_users_returns_the_new_session_token (accounts.tests.LoginAPITests.test_switching_users_returns_the_new_session_token) ... ok
+test_unknown_username_returns_401 (accounts.tests.LoginAPITests.test_unknown_username_returns_401) ... ok
+test_wrong_password_and_unknown_username_return_identical_messages (accounts.tests.LoginAPITests.test_wrong_password_and_unknown_username_return_identical_messages) ... ok
+test_wrong_password_returns_401 (accounts.tests.LoginAPITests.test_wrong_password_returns_401) ... ok
+test_is_admin_allows_admin_only (accounts.tests.RolePermissionTests.test_is_admin_allows_admin_only) ... ok
+test_is_student_parent_allows_student_parent_only (accounts.tests.RolePermissionTests.test_is_student_parent_allows_student_parent_only) ... ok
+test_is_teacher_allows_teacher_only (accounts.tests.RolePermissionTests.test_is_teacher_allows_teacher_only) ... ok
+test_role_permissions_reject_anonymous_users (accounts.tests.RolePermissionTests.test_role_permissions_reject_anonymous_users) ... ok
+test_account_form_requires_password_when_creating_user (accounts.tests.UserAccountManagementTests.test_account_form_requires_password_when_creating_user) ... ok
+test_admin_can_create_edit_and_delete_user (accounts.tests.UserAccountManagementTests.test_admin_can_create_edit_and_delete_user) ... ok
+test_duplicate_username_is_rejected (accounts.tests.UserAccountManagementTests.test_duplicate_username_is_rejected) ... ok
+test_non_admin_cannot_manage_user_accounts (accounts.tests.UserAccountManagementTests.test_non_admin_cannot_manage_user_accounts) ... ok
+test_role_change_updates_permissions_for_existing_session (accounts.tests.UserAccountManagementTests.test_role_change_updates_permissions_for_existing_session) ... ok
+test_can_create_teacher (accounts.tests.UserModelTests.test_can_create_teacher) ... ok
+test_default_role_is_student_parent (accounts.tests.UserModelTests.test_default_role_is_student_parent) ... ok
+test_password_is_hashed (accounts.tests.UserModelTests.test_password_is_hashed) ... ok
+test_daily_excel_contains_the_records_shown_in_daily_view (attendance.tests.AttendanceReportExportTests.test_daily_excel_contains_the_records_shown_in_daily_view) ... 2026-11-16 05:28:43,354 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-23 record_count=3
+2026-11-16 05:28:43,358 INFO sams.notifications Notification skipped, no parent email notification_id=1 student_id=2
+ok
+test_pdf_exports_are_valid_and_empty_daily_report_is_downloadable (attendance.tests.AttendanceReportExportTests.test_pdf_exports_are_valid_and_empty_daily_report_is_downloadable) ... ok
+test_role_restrictions_are_preserved_for_exports (attendance.tests.AttendanceReportExportTests.test_role_restrictions_are_preserved_for_exports) ... ok
+test_student_excel_exports_empty_history_with_headers (attendance.tests.AttendanceReportExportTests.test_student_excel_exports_empty_history_with_headers) ... ok
+test_summary_and_student_reports_can_be_exported_as_pdf (attendance.tests.AttendanceReportExportTests.test_summary_and_student_reports_can_be_exported_as_pdf) ... 2026-11-16 05:28:52,756 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-23 record_count=3
+ok
+test_summary_excel_contains_displayed_class_and_grade_rows (attendance.tests.AttendanceReportExportTests.test_summary_excel_contains_displayed_class_and_grade_rows) ... 2026-11-16 05:28:54,742 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-23 record_count=3
+2026-11-16 05:28:54,746 INFO sams.notifications Notification skipped, no parent email notification_id=1 student_id=2
+ok
+test_unsupported_format_and_unknown_report_are_reported (attendance.tests.AttendanceReportExportTests.test_unsupported_format_and_unknown_report_are_reported) ... ok
+test_database_blocks_duplicate_rows (attendance.tests.AttendanceServiceUnitTests.test_database_blocks_duplicate_rows) ... ok
+test_duplicate_check_false_before_marking (attendance.tests.AttendanceServiceUnitTests.test_duplicate_check_false_before_marking) ... ok
+test_duplicate_check_true_after_marking (attendance.tests.AttendanceServiceUnitTests.test_duplicate_check_true_after_marking) ... 2026-11-16 05:29:03,093 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-23 record_count=3
+ok
+test_invalid_status_is_rejected (attendance.tests.AttendanceServiceUnitTests.test_invalid_status_is_rejected) ... ok
+test_only_assigned_teacher_counts_as_class_teacher (attendance.tests.AttendanceServiceUnitTests.test_only_assigned_teacher_counts_as_class_teacher) ... ok
+test_timestamp_set_on_save_and_updated_on_edit (attendance.tests.AttendanceServiceUnitTests.test_timestamp_set_on_save_and_updated_on_edit) ... 2026-11-16 05:29:09,805 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-23 record_count=3
+2026-11-16 05:29:09,817 INFO sams.attendance Attendance edited user_id=1 attendance_id=1 class_id=1 old_status=Present new_status=Late
+ok
+test_valid_statuses_are_accepted (attendance.tests.AttendanceServiceUnitTests.test_valid_statuses_are_accepted) ... ok
+test_invalid_or_reversed_date_range_is_rejected (attendance.tests.AttendanceSummaryApiTests.test_invalid_or_reversed_date_range_is_rejected) ... ok
+test_period_without_attendance_returns_zero_totals (attendance.tests.AttendanceSummaryApiTests.test_period_without_attendance_returns_zero_totals) ... ok
+test_selected_period_returns_class_and_grade_totals (attendance.tests.AttendanceSummaryApiTests.test_selected_period_returns_class_and_grade_totals) ... 2026-11-16 05:29:18,872 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-19 record_count=4
+2026-11-16 05:29:18,889 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-20 record_count=4
+2026-11-16 05:29:18,906 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-21 record_count=4
+2026-11-16 05:29:18,912 INFO sams.notifications Notification skipped, no parent email notification_id=1 student_id=1
+ok
+test_summary_class_and_student_filters_can_be_used_individually (attendance.tests.AttendanceSummaryApiTests.test_summary_class_and_student_filters_can_be_used_individually) ... 2026-11-16 05:29:21,322 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-20 record_count=3
+2026-11-16 05:29:21,330 INFO sams.notifications Notification skipped, no parent email notification_id=1 student_id=1
+ok
+test_summary_filters_by_date_class_and_student_with_and_semantics (attendance.tests.AttendanceSummaryApiTests.test_summary_filters_by_date_class_and_student_with_and_semantics) ... 2026-11-16 05:29:23,611 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-19 record_count=3
+2026-11-16 05:29:23,625 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-20 record_count=3
+2026-11-16 05:29:23,632 INFO sams.notifications Notification skipped, no parent email notification_id=1 student_id=1
+ok
+test_summary_filters_return_empty_scoped_totals (attendance.tests.AttendanceSummaryApiTests.test_summary_filters_return_empty_scoped_totals) ... ok
+test_summary_is_admin_only (attendance.tests.AttendanceSummaryApiTests.test_summary_is_admin_only) ... ok
+test_summary_rejects_invalid_filter_identifiers (attendance.tests.AttendanceSummaryApiTests.test_summary_rejects_invalid_filter_identifiers) ... ok
+test_all_present_is_100_percent (attendance.tests.AttendanceSummaryUnitTests.test_all_present_is_100_percent) ... ok
+test_late_counts_as_present_but_absent_and_excused_do_not (attendance.tests.AttendanceSummaryUnitTests.test_late_counts_as_present_but_absent_and_excused_do_not) ... ok
+test_no_days_gives_zero_and_does_not_crash (attendance.tests.AttendanceSummaryUnitTests.test_no_days_gives_zero_and_does_not_crash) ... ok
+test_percentage_is_rounded_to_one_decimal (attendance.tests.AttendanceSummaryUnitTests.test_percentage_is_rounded_to_one_decimal) ... ok
+test_admin_can_view_any_class (attendance.tests.DailyAttendanceApiTests.test_admin_can_view_any_class) ... 2026-11-16 05:29:32,666 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-23 record_count=3
+2026-11-16 05:29:32,671 INFO sams.notifications Notification skipped, no parent email notification_id=1 student_id=2
+ok
+test_bad_input_gets_400_or_404 (attendance.tests.DailyAttendanceApiTests.test_bad_input_gets_400_or_404) ... ok
+test_day_with_no_attendance_returns_clear_message (attendance.tests.DailyAttendanceApiTests.test_day_with_no_attendance_returns_clear_message) ... ok
+test_not_logged_in_is_refused (attendance.tests.DailyAttendanceApiTests.test_not_logged_in_is_refused) ... ok
+test_only_the_requested_date_is_returned (attendance.tests.DailyAttendanceApiTests.test_only_the_requested_date_is_returned) ... 2026-11-16 05:29:41,905 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-22 record_count=3
+2026-11-16 05:29:41,911 INFO sams.notifications Notification skipped, no parent email notification_id=1 student_id=2
+ok
+test_other_teacher_gets_403 (attendance.tests.DailyAttendanceApiTests.test_other_teacher_gets_403) ... 2026-11-16 05:29:44,174 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-23 record_count=3
+2026-11-16 05:29:44,180 INFO sams.notifications Notification skipped, no parent email notification_id=1 student_id=2
+ok
+test_student_filter_returns_only_that_students_record_and_counts (attendance.tests.DailyAttendanceApiTests.test_student_filter_returns_only_that_students_record_and_counts) ... 2026-11-16 05:29:46,451 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-23 record_count=3
+2026-11-16 05:29:46,456 INFO sams.notifications Notification skipped, no parent email notification_id=1 student_id=2
+ok
+test_student_parent_gets_403 (attendance.tests.DailyAttendanceApiTests.test_student_parent_gets_403) ... ok
+test_teacher_sees_every_student_status_for_a_marked_day (attendance.tests.DailyAttendanceApiTests.test_teacher_sees_every_student_status_for_a_marked_day) ... 2026-11-16 05:29:51,710 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-23 record_count=3
+2026-11-16 05:29:51,716 INFO sams.notifications Notification skipped, no parent email notification_id=1 student_id=2
+ok
+test_unassigned_teacher_and_admin_cannot_edit_daily_records (attendance.tests.DailyAttendanceApiTests.test_unassigned_teacher_and_admin_cannot_edit_daily_records) ... 2026-11-16 05:29:53,961 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-23 record_count=3
+2026-11-16 05:29:53,966 INFO sams.notifications Notification skipped, no parent email notification_id=1 student_id=2
+ok
+test_sqlite_backup_and_restore_round_trip (attendance.tests.DatabaseBackupCommandTests.test_sqlite_backup_and_restore_round_trip) ... ok
+test_admin_can_edit_through_django_admin_with_one_audit_entry (attendance.tests.EditAttendanceApiTests.test_admin_can_edit_through_django_admin_with_one_audit_entry) ... 2026-11-16 05:29:56,508 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-23 record_count=3
+2026-11-16 05:29:57,446 INFO sams.attendance Attendance edited user_id=4 attendance_id=1 class_id=1 old_status=Present new_status=Late
+ok
+test_editing_missing_record_gets_404 (attendance.tests.EditAttendanceApiTests.test_editing_missing_record_gets_404) ... 2026-11-16 05:29:59,697 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-23 record_count=3
+ok
+test_editing_same_status_does_not_create_audit_or_notification (attendance.tests.EditAttendanceApiTests.test_editing_same_status_does_not_create_audit_or_notification) ... 2026-11-16 05:30:02,004 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-23 record_count=3
+ok
+test_invalid_status_on_edit_gets_400 (attendance.tests.EditAttendanceApiTests.test_invalid_status_on_edit_gets_400) ... 2026-11-16 05:30:04,315 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-23 record_count=3
+ok
+test_parent_cannot_edit (attendance.tests.EditAttendanceApiTests.test_parent_cannot_edit) ... 2026-11-16 05:30:06,516 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-23 record_count=3
+2026-11-16 05:30:07,174 WARNING sams.attendance Attendance edit rejected: unassigned teacher user_id=4 attendance_id=1
+ok
+test_teacher_edits_status_and_audit_log_is_created (attendance.tests.EditAttendanceApiTests.test_teacher_edits_status_and_audit_log_is_created) ... 2026-11-16 05:30:09,097 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-23 record_count=3
+2026-11-16 05:30:09,117 INFO sams.attendance Attendance edited user_id=1 attendance_id=1 class_id=1 old_status=Present new_status=Absent
+2026-11-16 05:30:09,119 INFO sams.notifications Notification skipped, no parent email notification_id=1 student_id=1
+ok
+test_wrong_teacher_cannot_edit (attendance.tests.EditAttendanceApiTests.test_wrong_teacher_cannot_edit) ... 2026-11-16 05:30:11,231 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-23 record_count=3
+2026-11-16 05:30:11,267 WARNING sams.attendance Attendance edit rejected: unassigned teacher user_id=2 attendance_id=1
+ok
+test_class_of_50_is_saved_in_one_request_under_5_seconds (attendance.tests.FiftyStudentSubmissionTests.test_class_of_50_is_saved_in_one_request_under_5_seconds) ... 2026-11-16 05:30:13,708 INFO sams.attendance Attendance submitted user_id=1 class_id=2 date=2026-10-23 record_count=50
+2026-11-16 05:30:13,715 INFO sams.notifications Notification skipped, no parent email notification_id=1 student_id=8
+2026-11-16 05:30:13,717 INFO sams.notifications Notification skipped, no parent email notification_id=2 student_id=13
+2026-11-16 05:30:13,718 INFO sams.notifications Notification skipped, no parent email notification_id=3 student_id=18
+2026-11-16 05:30:13,720 INFO sams.notifications Notification skipped, no parent email notification_id=4 student_id=23
+2026-11-16 05:30:13,722 INFO sams.notifications Notification skipped, no parent email notification_id=5 student_id=28
+2026-11-16 05:30:13,723 INFO sams.notifications Notification skipped, no parent email notification_id=6 student_id=33
+2026-11-16 05:30:13,725 INFO sams.notifications Notification skipped, no parent email notification_id=7 student_id=38
+2026-11-16 05:30:13,726 INFO sams.notifications Notification skipped, no parent email notification_id=8 student_id=43
+2026-11-16 05:30:13,728 INFO sams.notifications Notification skipped, no parent email notification_id=9 student_id=48
+2026-11-16 05:30:13,729 INFO sams.notifications Notification skipped, no parent email notification_id=10 student_id=53
+ok
+test_number_of_queries_does_not_grow_with_class_size (attendance.tests.FiftyStudentSubmissionTests.test_number_of_queries_does_not_grow_with_class_size) ... 2026-11-16 05:30:16,453 INFO sams.attendance Attendance submitted user_id=1 class_id=2 date=2026-10-23 record_count=5
+2026-11-16 05:30:16,511 INFO sams.attendance Attendance submitted user_id=1 class_id=3 date=2026-10-23 record_count=50
+ok
+test_admin_cannot_mark_attendance (attendance.tests.MarkAttendanceApiTests.test_admin_cannot_mark_attendance) ... 2026-11-16 05:30:18,779 WARNING sams.attendance Attendance submission rejected: unassigned teacher user_id=3 class_id=1
+2026-11-16 05:30:18,779 WARNING sams.attendance Attendance API request failed user_id=3 status=403
+ok
+test_all_four_statuses_are_saved (attendance.tests.MarkAttendanceApiTests.test_all_four_statuses_are_saved) ... 2026-11-16 05:30:21,079 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-23 record_count=3
+2026-11-16 05:30:21,086 INFO sams.notifications Notification skipped, no parent email notification_id=1 student_id=1
+ok
+test_attendance_submission_writes_a_safe_application_log_event (attendance.tests.MarkAttendanceApiTests.test_attendance_submission_writes_a_safe_application_log_event) ... ok
+test_bad_date_gets_400 (attendance.tests.MarkAttendanceApiTests.test_bad_date_gets_400) ... 2026-11-16 05:30:25,602 WARNING sams.attendance Attendance API request failed user_id=1 status=400
+ok
+test_class_with_no_students_gets_400 (attendance.tests.MarkAttendanceApiTests.test_class_with_no_students_gets_400) ... 2026-11-16 05:30:27,897 WARNING sams.attendance Attendance submission rejected: class has no students class_id=2
+2026-11-16 05:30:27,897 WARNING sams.attendance Attendance API request failed user_id=1 status=400
+ok
+test_future_date_is_rejected_and_nothing_is_saved (attendance.tests.MarkAttendanceApiTests.test_future_date_is_rejected_and_nothing_is_saved) ... 2026-11-16 05:30:30,218 WARNING sams.attendance Attendance submission rejected: future date user_id=1 class_id=1 date=2026-11-17
+2026-11-16 05:30:30,218 WARNING sams.attendance Attendance API request failed user_id=1 status=400
+ok
+test_invalid_status_gets_400 (attendance.tests.MarkAttendanceApiTests.test_invalid_status_gets_400) ... 2026-11-16 05:30:32,494 WARNING sams.attendance Attendance submission rejected: invalid status user_id=1 class_id=1
+2026-11-16 05:30:32,495 WARNING sams.attendance Attendance API request failed user_id=1 status=400
+ok
+test_mark_all_present_with_exceptions (attendance.tests.MarkAttendanceApiTests.test_mark_all_present_with_exceptions) ... 2026-11-16 05:30:34,809 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-23 record_count=3
+2026-11-16 05:30:34,814 INFO sams.notifications Notification skipped, no parent email notification_id=1 student_id=2
+ok
+test_marking_twice_returns_409 (attendance.tests.MarkAttendanceApiTests.test_marking_twice_returns_409) ... 2026-11-16 05:30:37,098 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-23 record_count=3
+2026-11-16 05:30:37,117 INFO sams.attendance Attendance submission rejected: already marked user_id=1 class_id=1 date=2026-10-23
+2026-11-16 05:30:37,117 WARNING sams.attendance Attendance API request failed user_id=1 status=409
+ok
+test_missing_fields_get_400 (attendance.tests.MarkAttendanceApiTests.test_missing_fields_get_400) ... 2026-11-16 05:30:39,443 WARNING sams.attendance Attendance API request failed user_id=1 status=400
+ok
+test_not_logged_in_gets_401 (attendance.tests.MarkAttendanceApiTests.test_not_logged_in_gets_401) ... ok
+test_same_class_on_different_date_is_allowed (attendance.tests.MarkAttendanceApiTests.test_same_class_on_different_date_is_allowed) ... 2026-11-16 05:30:43,947 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-22 record_count=3
+2026-11-16 05:30:43,967 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-23 record_count=3
+ok
+test_student_from_another_class_gets_400 (attendance.tests.MarkAttendanceApiTests.test_student_from_another_class_gets_400) ... 2026-11-16 05:30:46,262 WARNING sams.attendance Attendance submission rejected: student not in class user_id=1 class_id=1
+2026-11-16 05:30:46,263 WARNING sams.attendance Attendance API request failed user_id=1 status=400
+ok
+test_teacher_marks_whole_class (attendance.tests.MarkAttendanceApiTests.test_teacher_marks_whole_class) ... 2026-11-16 05:30:48,600 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-23 record_count=3
+ok
+test_today_is_still_allowed (attendance.tests.MarkAttendanceApiTests.test_today_is_still_allowed) ... 2026-11-16 05:30:50,894 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-11-16 record_count=3
+ok
+test_wrong_teacher_gets_403 (attendance.tests.MarkAttendanceApiTests.test_wrong_teacher_gets_403) ... 2026-11-16 05:30:53,178 WARNING sams.attendance Attendance submission rejected: unassigned teacher user_id=2 class_id=1
+2026-11-16 05:30:53,178 WARNING sams.attendance Attendance API request failed user_id=2 status=403
+ok
+test_health_check_reports_503_when_database_is_down (attendance.tests.ReliabilityTests.test_health_check_reports_503_when_database_is_down) ... ok
+test_health_check_reports_ok_without_login (attendance.tests.ReliabilityTests.test_health_check_reports_ok_without_login) ... ok
+test_rejected_duplicate_leaves_no_partial_data (attendance.tests.ReliabilityTests.test_rejected_duplicate_leaves_no_partial_data) ... 2026-11-16 05:30:59,950 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-23 record_count=3
+2026-11-16 05:30:59,967 INFO sams.attendance Attendance submission rejected: already marked user_id=1 class_id=1 date=2026-10-23
+2026-11-16 05:30:59,967 WARNING sams.attendance Attendance API request failed user_id=1 status=409
+ok
+test_two_submissions_at_the_same_moment_save_only_one_set (attendance.tests.ReliabilityTests.test_two_submissions_at_the_same_moment_save_only_one_set) ... 2026-11-16 05:31:02,235 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-23 record_count=3
+2026-11-16 05:31:02,240 INFO sams.notifications Notification skipped, no parent email notification_id=1 student_id=1
+2026-11-16 05:31:02,255 ERROR sams.attendance Attendance submission conflicted with an existing record user_id=1 class_id=1 date=2026-10-23
+Traceback (most recent call last):
+  File "C:\Users\shara\Student-Attendance-Management-System\venv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "C:\Users\shara\Student-Attendance-Management-System\venv\Lib\site-packages\django\db\backends\sqlite3\base.py", line 359, in execute
+    return super().execute(query, params)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+sqlite3.IntegrityError: UNIQUE constraint failed: attendance_attendance.student_id, attendance_attendance.academic_class_id, attendance_attendance.date
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\shara\Student-Attendance-Management-System\attendance\services.py", line 135, in mark_attendance
+    Attendance.objects.bulk_create(entries)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\shara\Student-Attendance-Management-System\venv\Lib\site-packages\django\db\models\manager.py", line 87, in manager_method
+    return getattr(self.get_queryset(), name)(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\shara\Student-Attendance-Management-System\venv\Lib\site-packages\django\db\models\query.py", line 916, in bulk_create
+    returned_columns = self._batched_insert(
+        objs_without_pk,
+    ...<4 lines>...
+        unique_fields=unique_fields,
+    )
+  File "C:\Users\shara\Student-Attendance-Management-System\venv\Lib\site-packages\django\db\models\query.py", line 2204, in _batched_insert
+    self._insert(
+    ~~~~~~~~~~~~^
+        item,
+        ^^^^^
+    ...<5 lines>...
+        returning_fields=returning_fields,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\shara\Student-Attendance-Management-System\venv\Lib\site-packages\django\db\models\query.py", line 2166, in _insert
+    return query.get_compiler(using=using).execute_sql(returning_fields)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\shara\Student-Attendance-Management-System\venv\Lib\site-packages\django\db\models\sql\compiler.py", line 1954, in execute_sql
+    cursor.execute(sql, params)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "C:\Users\shara\Student-Attendance-Management-System\venv\Lib\site-packages\django\db\backends\utils.py", line 79, in execute
+    return self._execute_with_wrappers(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        sql, params, many=False, executor=self._execute
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\shara\Student-Attendance-Management-System\venv\Lib\site-packages\django\db\backends\utils.py", line 92, in _execute_with_wrappers
+    return executor(sql, params, many, context)
+  File "C:\Users\shara\Student-Attendance-Management-System\venv\Lib\site-packages\django\db\backends\utils.py", line 100, in _execute
+    with self.db.wrap_database_errors:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\shara\Student-Attendance-Management-System\venv\Lib\site-packages\django\db\utils.py", line 94, in __exit__
+    raise dj_exc_value.with_traceback(traceback) from exc_value
+  File "C:\Users\shara\Student-Attendance-Management-System\venv\Lib\site-packages\django\db\backends\utils.py", line 105, in _execute
+    return self.cursor.execute(sql, params)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "C:\Users\shara\Student-Attendance-Management-System\venv\Lib\site-packages\django\db\backends\sqlite3\base.py", line 359, in execute
+    return super().execute(query, params)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+django.db.utils.IntegrityError: UNIQUE constraint failed: attendance_attendance.student_id, attendance_attendance.academic_class_id, attendance_attendance.date
+2026-11-16 05:31:02,286 WARNING sams.attendance Attendance API request failed user_id=1 status=409
+ok
+test_every_report_page_downloads_for_each_allowed_role (attendance.tests.ReportExportAcceptHeaderTests.test_every_report_page_downloads_for_each_allowed_role) ... 2026-11-16 05:31:05,328 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-23 record_count=3
+ok
+test_failed_export_returns_a_json_message_not_406 (attendance.tests.ReportExportAcceptHeaderTests.test_failed_export_returns_a_json_message_not_406) ... ok
+test_logged_out_export_returns_a_json_error (attendance.tests.ReportExportAcceptHeaderTests.test_logged_out_export_returns_a_json_error) ... ok
+test_attendance_table_is_indexed_on_student_class_and_date (attendance.tests.ScaleAndIndexTests.test_attendance_table_is_indexed_on_student_class_and_date) ... ok
+test_daily_view_stays_fast_with_1000_students_of_data (attendance.tests.ScaleAndIndexTests.test_daily_view_stays_fast_with_1000_students_of_data) ... ok
+test_admin_can_see_any_student (attendance.tests.StudentHistoryApiTests.test_admin_can_see_any_student) ... 2026-11-16 05:31:20,079 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-20 record_count=3
+2026-11-16 05:31:20,093 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-21 record_count=3
+2026-11-16 05:31:20,100 INFO sams.notifications Notification skipped, no parent email notification_id=1 student_id=1
+2026-11-16 05:31:20,111 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-22 record_count=3
+ok
+test_class_teacher_can_see_their_student_but_other_teacher_cannot (attendance.tests.StudentHistoryApiTests.test_class_teacher_can_see_their_student_but_other_teacher_cannot) ... 2026-11-16 05:31:23,960 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-20 record_count=3
+2026-11-16 05:31:23,976 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-21 record_count=3
+2026-11-16 05:31:23,983 INFO sams.notifications Notification skipped, no parent email notification_id=1 student_id=1
+2026-11-16 05:31:23,993 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-22 record_count=3
+ok
+test_history_date_and_class_filters_recalculate_percentage (attendance.tests.StudentHistoryApiTests.test_history_date_and_class_filters_recalculate_percentage) ... 2026-11-16 05:31:27,850 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-20 record_count=3
+2026-11-16 05:31:27,868 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-21 record_count=3
+2026-11-16 05:31:27,875 INFO sams.notifications Notification skipped, no parent email notification_id=1 student_id=1
+2026-11-16 05:31:27,889 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-22 record_count=3
+ok
+test_history_filters_validate_dates_and_class (attendance.tests.StudentHistoryApiTests.test_history_filters_validate_dates_and_class) ... 2026-11-16 05:31:31,686 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-20 record_count=3
+2026-11-16 05:31:31,699 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-21 record_count=3
+2026-11-16 05:31:31,705 INFO sams.notifications Notification skipped, no parent email notification_id=1 student_id=1
+2026-11-16 05:31:31,716 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-22 record_count=3
+ok
+test_not_logged_in_is_refused (attendance.tests.StudentHistoryApiTests.test_not_logged_in_is_refused) ... 2026-11-16 05:31:35,548 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-20 record_count=3
+2026-11-16 05:31:35,562 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-21 record_count=3
+2026-11-16 05:31:35,568 INFO sams.notifications Notification skipped, no parent email notification_id=1 student_id=1
+2026-11-16 05:31:35,579 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-22 record_count=3
+ok
+test_parent_cannot_see_a_student_who_is_not_linked_to_anyone (attendance.tests.StudentHistoryApiTests.test_parent_cannot_see_a_student_who_is_not_linked_to_anyone) ... 2026-11-16 05:31:39,398 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-20 record_count=3
+2026-11-16 05:31:39,413 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-21 record_count=3
+2026-11-16 05:31:39,419 INFO sams.notifications Notification skipped, no parent email notification_id=1 student_id=1
+2026-11-16 05:31:39,430 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-22 record_count=3
+ok
+test_parent_cannot_see_another_students_data (attendance.tests.StudentHistoryApiTests.test_parent_cannot_see_another_students_data) ... 2026-11-16 05:31:43,227 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-20 record_count=3
+2026-11-16 05:31:43,240 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-21 record_count=3
+2026-11-16 05:31:43,246 INFO sams.notifications Notification skipped, no parent email notification_id=1 student_id=1
+2026-11-16 05:31:43,256 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-22 record_count=3
+ok
+test_parent_sees_their_own_childs_history_and_percentage (attendance.tests.StudentHistoryApiTests.test_parent_sees_their_own_childs_history_and_percentage) ... 2026-11-16 05:31:46,981 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-20 record_count=3
+2026-11-16 05:31:46,995 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-21 record_count=3
+2026-11-16 05:31:47,000 INFO sams.notifications Notification skipped, no parent email notification_id=1 student_id=1
+2026-11-16 05:31:47,011 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-22 record_count=3
+ok
+test_parent_with_no_linked_children_gets_403 (attendance.tests.StudentHistoryApiTests.test_parent_with_no_linked_children_gets_403) ... 2026-11-16 05:31:50,746 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-20 record_count=3
+2026-11-16 05:31:50,760 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-21 record_count=3
+2026-11-16 05:31:50,765 INFO sams.notifications Notification skipped, no parent email notification_id=1 student_id=1
+2026-11-16 05:31:50,775 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-22 record_count=3
+ok
+test_student_with_no_records_returns_zero_days (attendance.tests.StudentHistoryApiTests.test_student_with_no_records_returns_zero_days) ... 2026-11-16 05:31:55,280 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-20 record_count=3
+2026-11-16 05:31:55,293 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-21 record_count=3
+2026-11-16 05:31:55,299 INFO sams.notifications Notification skipped, no parent email notification_id=1 student_id=1
+2026-11-16 05:31:55,308 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-22 record_count=3
+ok
+test_unknown_student_gets_404 (attendance.tests.StudentHistoryApiTests.test_unknown_student_gets_404) ... 2026-11-16 05:31:59,071 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-20 record_count=3
+2026-11-16 05:31:59,083 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-21 record_count=3
+2026-11-16 05:31:59,088 INFO sams.notifications Notification skipped, no parent email notification_id=1 student_id=1
+2026-11-16 05:31:59,099 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-22 record_count=3
+ok
+test_absent_sends_email_to_parent_and_saves_record (notifications.tests.AbsenceNotificationIntegrationTests.test_absent_sends_email_to_parent_and_saves_record) ... 2026-11-16 05:32:02,148 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-27 record_count=3
+2026-11-16 05:32:03,537 INFO sams.notifications Notification sent notification_id=1 student_id=1 attempt=1
+ok
+test_editing_already_absent_does_not_send_duplicate_alert (notifications.tests.AbsenceNotificationIntegrationTests.test_editing_already_absent_does_not_send_duplicate_alert) ... 2026-11-16 05:32:06,494 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-27 record_count=3
+2026-11-16 05:32:06,501 INFO sams.notifications Notification sent notification_id=1 student_id=1 attempt=1
+ok
+test_editing_to_absent_notifies_and_editing_to_excused_does_not (notifications.tests.AbsenceNotificationIntegrationTests.test_editing_to_absent_notifies_and_editing_to_excused_does_not) ... 2026-11-16 05:32:09,536 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-27 record_count=3
+2026-11-16 05:32:09,548 INFO sams.attendance Attendance edited user_id=1 attendance_id=2 class_id=1 old_status=Present new_status=Excused
+2026-11-16 05:32:09,556 INFO sams.attendance Attendance edited user_id=1 attendance_id=2 class_id=1 old_status=Excused new_status=Absent
+2026-11-16 05:32:09,563 INFO sams.notifications Notification sent notification_id=1 student_id=2 attempt=1
+ok
+test_email_failure_does_not_block_saving_attendance (notifications.tests.AbsenceNotificationIntegrationTests.test_email_failure_does_not_block_saving_attendance) ... 2026-11-16 05:32:12,830 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-27 record_count=3
+2026-11-16 05:32:12,839 WARNING sams.notifications Notification send failed notification_id=1 student_id=1 attempt=1/3 error=OSError
+2026-11-16 05:32:12,841 WARNING sams.notifications Notification send failed notification_id=1 student_id=1 attempt=2/3 error=OSError
+2026-11-16 05:32:12,843 WARNING sams.notifications Notification send failed notification_id=1 student_id=1 attempt=3/3 error=OSError
+2026-11-16 05:32:12,844 ERROR sams.notifications Notification marked failed after 3 attempts notification_id=1 student_id=1
+ok
+test_excused_and_late_do_not_notify (notifications.tests.AbsenceNotificationIntegrationTests.test_excused_and_late_do_not_notify) ... 2026-11-16 05:32:16,063 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-27 record_count=3
+ok
+test_only_absent_students_in_a_mixed_class_are_notified (notifications.tests.AbsenceNotificationIntegrationTests.test_only_absent_students_in_a_mixed_class_are_notified) ... 2026-11-16 05:32:19,192 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-27 record_count=3
+2026-11-16 05:32:19,205 INFO sams.notifications Notification sent notification_id=1 student_id=1 attempt=1
+ok
+test_present_does_not_notify (notifications.tests.AbsenceNotificationIntegrationTests.test_present_does_not_notify) ... 2026-11-16 05:32:22,314 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-27 record_count=3
+ok
+test_student_without_parent_email_is_recorded_as_skipped (notifications.tests.AbsenceNotificationIntegrationTests.test_student_without_parent_email_is_recorded_as_skipped) ... 2026-11-16 05:32:25,451 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-27 record_count=3
+2026-11-16 05:32:25,456 INFO sams.notifications Notification skipped, no parent email notification_id=1 student_id=1
+ok
+test_editing_attendance_creates_audit_entry (notifications.tests.AuditLogTests.test_editing_attendance_creates_audit_entry) ... ok
+test_log_saves_who_when_and_what (notifications.tests.AuditLogTests.test_log_saves_who_when_and_what) ... ok
+test_log_works_without_user (notifications.tests.AuditLogTests.test_log_works_without_user) ... ok
+test_anonymous_user_is_sent_to_login_or_refused (notifications.tests.AuditLogViewTests.test_anonymous_user_is_sent_to_login_or_refused) ... ok
+test_api_response_includes_readable_fields (notifications.tests.AuditLogViewTests.test_api_response_includes_readable_fields) ... ok
+test_audit_log_link_only_in_admin_nav (notifications.tests.AuditLogViewTests.test_audit_log_link_only_in_admin_nav) ... ok
+test_filter_by_class (notifications.tests.AuditLogViewTests.test_filter_by_class) ... ok
+test_filter_by_date (notifications.tests.AuditLogViewTests.test_filter_by_date) ... ok
+test_filter_by_user (notifications.tests.AuditLogViewTests.test_filter_by_user) ... ok
+test_filters_combine (notifications.tests.AuditLogViewTests.test_filters_combine) ... ok
+test_invalid_filters_are_rejected (notifications.tests.AuditLogViewTests.test_invalid_filters_are_rejected) ... ok
+test_no_filter_returns_everything (notifications.tests.AuditLogViewTests.test_no_filter_returns_everything) ... ok
+test_no_matches_shows_message (notifications.tests.AuditLogViewTests.test_no_matches_shows_message) ... ok
+test_page_filters_by_date_and_user (notifications.tests.AuditLogViewTests.test_page_filters_by_date_and_user) ... ok
+test_page_shows_filtered_rows (notifications.tests.AuditLogViewTests.test_page_shows_filtered_rows) ... ok
+test_parent_gets_403_from_page_and_api (notifications.tests.AuditLogViewTests.test_parent_gets_403_from_page_and_api) ... ok
+test_teacher_gets_403_from_page_and_api (notifications.tests.AuditLogViewTests.test_teacher_gets_403_from_page_and_api) ... ok
+test_absence_email_is_retried_through_attendance_api (notifications.tests.NotificationRetryTests.test_absence_email_is_retried_through_attendance_api) ... 2026-11-16 05:33:13,623 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-10-27 record_count=3
+2026-11-16 05:33:13,631 WARNING sams.notifications Notification send failed notification_id=1 student_id=1 attempt=1/3 error=ConnectionError
+2026-11-16 05:33:13,633 INFO sams.notifications Notification sent notification_id=1 student_id=1 attempt=2
+ok
+test_gives_up_after_three_failures_and_marks_failed (notifications.tests.NotificationRetryTests.test_gives_up_after_three_failures_and_marks_failed) ... ok
+test_max_attempts_is_three (notifications.tests.NotificationRetryTests.test_max_attempts_is_three) ... ok
+test_retries_and_succeeds_on_third_attempt (notifications.tests.NotificationRetryTests.test_retries_and_succeeds_on_third_attempt) ... 2026-11-16 05:33:22,600 WARNING sams.notifications Notification send failed notification_id=1 student_id=1 attempt=1/3 error=ConnectionError
+2026-11-16 05:33:22,602 WARNING sams.notifications Notification send failed notification_id=1 student_id=1 attempt=2/3 error=ConnectionError
+2026-11-16 05:33:22,604 INFO sams.notifications Notification sent notification_id=1 student_id=1 attempt=3
+ok
+test_status_is_pending_between_attempts (notifications.tests.NotificationRetryTests.test_status_is_pending_between_attempts) ... 2026-11-16 05:33:25,676 WARNING sams.notifications Notification send failed notification_id=1 student_id=1 attempt=1/3 error=ConnectionError
+2026-11-16 05:33:25,680 WARNING sams.notifications Notification send failed notification_id=1 student_id=1 attempt=2/3 error=ConnectionError
+2026-11-16 05:33:25,683 WARNING sams.notifications Notification send failed notification_id=1 student_id=1 attempt=3/3 error=ConnectionError
+2026-11-16 05:33:25,683 ERROR sams.notifications Notification marked failed after 3 attempts notification_id=1 student_id=1
+ok
+test_succeeds_first_time_with_one_attempt (notifications.tests.NotificationRetryTests.test_succeeds_first_time_with_one_attempt) ... 2026-11-16 05:33:28,779 INFO sams.notifications Notification sent notification_id=1 student_id=1 attempt=1
+ok
+test_notify_absence_ignores_non_absent_statuses (notifications.tests.NotifyAbsenceUnitTests.test_notify_absence_ignores_non_absent_statuses) ... ok
+test_admin_can_open_summary_page (pages.tests.AttendanceSummaryPageTests.test_admin_can_open_summary_page) ... ok
+test_admin_navigation_link_is_not_shown_to_teacher (pages.tests.AttendanceSummaryPageTests.test_admin_navigation_link_is_not_shown_to_teacher) ... ok
+test_non_admin_users_cannot_open_summary_page (pages.tests.AttendanceSummaryPageTests.test_non_admin_users_cannot_open_summary_page) ... ok
+test_admin_sees_every_class (pages.tests.DailyPageAndNavigationTests.test_admin_sees_every_class) ... ok
+test_admin_site_link_not_in_main_menu (pages.tests.DailyPageAndNavigationTests.test_admin_site_link_not_in_main_menu) ... ok
+test_anonymous_is_sent_to_login (pages.tests.DailyPageAndNavigationTests.test_anonymous_is_sent_to_login) ... ok
+test_daily_page_includes_attendance_edit_control (pages.tests.DailyPageAndNavigationTests.test_daily_page_includes_attendance_edit_control) ... ok
+test_header_links_match_the_role (pages.tests.DailyPageAndNavigationTests.test_header_links_match_the_role) ... ok
+test_login_page_has_no_admin_site_link (pages.tests.DailyPageAndNavigationTests.test_login_page_has_no_admin_site_link) ... ok
+test_student_parent_is_redirected (pages.tests.DailyPageAndNavigationTests.test_student_parent_is_redirected) ... ok
+test_teacher_only_sees_their_own_classes (pages.tests.DailyPageAndNavigationTests.test_teacher_only_sees_their_own_classes) ... ok
+test_edit_modal_is_above_the_script (pages.tests.EditAttendanceModalOrderTests.test_edit_modal_is_above_the_script) ... ok
+test_signed_in_user_goes_to_their_dashboard_instead (pages.tests.LandingPageTests.test_signed_in_user_goes_to_their_dashboard_instead) ... ok
+test_visitor_sees_landing_page_with_login_button (pages.tests.LandingPageTests.test_visitor_sees_landing_page_with_login_button) ... ok
+test_another_teachers_class_cannot_be_opened_by_url (pages.tests.MarkAttendanceClassListTests.test_another_teachers_class_cannot_be_opened_by_url) ... ok
+test_dropdown_matches_the_daily_view_page (pages.tests.MarkAttendanceClassListTests.test_dropdown_matches_the_daily_view_page) ... ok
+test_teacher_only_sees_their_own_classes_in_the_dropdown (pages.tests.MarkAttendanceClassListTests.test_teacher_only_sees_their_own_classes_in_the_dropdown) ... ok
+test_teacher_without_classes_sees_a_message (pages.tests.MarkAttendanceClassListTests.test_teacher_without_classes_sees_a_message) ... ok
+test_date_picker_stops_at_today (pages.tests.MarkAttendanceDatePickerTests.test_date_picker_stops_at_today) ... ok
+test_anonymous_is_sent_to_login (pages.tests.MyAttendancePageTests.test_anonymous_is_sent_to_login) ... ok
+test_home_sends_a_parent_to_the_attendance_page (pages.tests.MyAttendancePageTests.test_home_sends_a_parent_to_the_attendance_page) ... ok
+test_parent_does_not_see_other_parents_children (pages.tests.MyAttendancePageTests.test_parent_does_not_see_other_parents_children) ... ok
+test_parent_sees_their_child_on_the_page (pages.tests.MyAttendancePageTests.test_parent_sees_their_child_on_the_page) ... ok
+test_parent_with_no_linked_child_sees_a_clear_message (pages.tests.MyAttendancePageTests.test_parent_with_no_linked_child_sees_a_clear_message) ... ok
+test_teacher_is_redirected_away_and_has_no_nav_link (pages.tests.MyAttendancePageTests.test_teacher_is_redirected_away_and_has_no_nav_link) ... ok
+test_admin_can_open_student_list (pages.tests.PageAccessTests.test_admin_can_open_student_list) ... ok
+test_admin_is_redirected_from_mark_attendance (pages.tests.PageAccessTests.test_admin_is_redirected_from_mark_attendance) ... ok
+test_anonymous_is_sent_to_login (pages.tests.PageAccessTests.test_anonymous_is_sent_to_login) ... ok
+test_header_shows_name_role_and_logout (pages.tests.PageAccessTests.test_header_shows_name_role_and_logout) ... ok
+test_login_page_loads (pages.tests.PageAccessTests.test_login_page_loads) ... ok
+test_student_list_urls_share_canonical_route (pages.tests.PageAccessTests.test_student_list_urls_share_canonical_route) ... ok
+test_student_parent_is_redirected_from_both_pages (pages.tests.PageAccessTests.test_student_parent_is_redirected_from_both_pages) ... ok
+test_teacher_can_open_both_pages (pages.tests.PageAccessTests.test_teacher_can_open_both_pages) ... ok
+test_every_page_has_the_popup_area (pages.tests.PopupMessageTests.test_every_page_has_the_popup_area) ... ok
+test_mark_attendance_result_is_a_popup (pages.tests.PopupMessageTests.test_mark_attendance_result_is_a_popup) ... ok
+test_server_messages_show_as_a_popup (pages.tests.PopupMessageTests.test_server_messages_show_as_a_popup) ... ok
+test_admin_menu (pages.tests.RoleMenuTests.test_admin_menu) ... ok
+test_current_page_is_highlighted (pages.tests.RoleMenuTests.test_current_page_is_highlighted) ... ok
+test_parent_menu (pages.tests.RoleMenuTests.test_parent_menu) ... ok
+test_teacher_menu (pages.tests.RoleMenuTests.test_teacher_menu) ... ok
+test_activity_just_before_timeout_resets_session_expiry (pages.tests.SessionInactivityTests.test_activity_just_before_timeout_resets_session_expiry) ... ok
+test_expired_session_is_rejected (pages.tests.SessionInactivityTests.test_expired_session_is_rejected) ... ok
+test_class_with_no_students (pages.tests.TeacherDashboardTests.test_class_with_no_students) ... ok
+test_marked_class_shows_marked_and_absent_count (pages.tests.TeacherDashboardTests.test_marked_class_shows_marked_and_absent_count) ... 2026-11-16 05:34:12,542 INFO sams.attendance Attendance submitted user_id=1 class_id=1 date=2026-11-16 record_count=2
+2026-11-16 05:34:12,547 INFO sams.notifications Notification skipped, no parent email notification_id=1 student_id=1
+ok
+test_shows_only_the_teachers_own_classes (pages.tests.TeacherDashboardTests.test_shows_only_the_teachers_own_classes) ... ok
+test_teacher_with_no_classes (pages.tests.TeacherDashboardTests.test_teacher_with_no_classes) ... ok
+test_unmarked_class_shows_mark_button (pages.tests.TeacherDashboardTests.test_unmarked_class_shows_mark_button) ... ok
+test_every_role_page_is_mobile_ready (pages.tests.UsabilityCompatibilityTests.test_every_role_page_is_mobile_ready) ... ok
+test_login_page_is_mobile_ready (pages.tests.UsabilityCompatibilityTests.test_login_page_is_mobile_ready) ... ok
+test_marking_needs_at_most_one_tap_per_student (pages.tests.UsabilityCompatibilityTests.test_marking_needs_at_most_one_tap_per_student) ... ok
+test_status_buttons_are_touch_sized (pages.tests.UsabilityCompatibilityTests.test_status_buttons_are_touch_sized) ... ok
+test_tables_scroll_inside_their_container (pages.tests.UsabilityCompatibilityTests.test_tables_scroll_inside_their_container) ... ok
+test_admin_home_shows_counts_attendance_and_quick_links (sams_project.tests_integration.AdminDashboardIntegrationTests.test_admin_home_shows_counts_attendance_and_quick_links) ... ok
+test_non_admin_does_not_see_admin_dashboard (sams_project.tests_integration.AdminDashboardIntegrationTests.test_non_admin_does_not_see_admin_dashboard) ... ok
+test_admin_cannot_mark_attendance (sams_project.tests_integration.CrossModuleFlowTests.test_admin_cannot_mark_attendance) ... 2026-11-16 05:34:37,000 INFO sams.students Class created user_id=1 record_id=1
+2026-11-16 05:34:37,021 INFO sams.students Section created user_id=1 record_id=1
+2026-11-16 05:34:37,042 INFO sams.students Student created user_id=1 student_id=1
+2026-11-16 05:34:37,059 INFO sams.students Student created user_id=1 student_id=2
+2026-11-16 05:34:37,078 INFO sams.students Student created user_id=1 student_id=3
+2026-11-16 05:34:37,091 WARNING sams.attendance Attendance submission rejected: unassigned teacher user_id=1 class_id=1
+2026-11-16 05:34:37,091 WARNING sams.attendance Attendance API request failed user_id=1 status=403
+ok
+test_full_flow_admin_setup_teacher_marks_edits_and_audit_log (sams_project.tests_integration.CrossModuleFlowTests.test_full_flow_admin_setup_teacher_marks_edits_and_audit_log) ... 2026-11-16 05:34:40,161 INFO sams.students Class created user_id=1 record_id=1
+2026-11-16 05:34:40,178 INFO sams.students Section created user_id=1 record_id=1
+2026-11-16 05:34:40,197 INFO sams.students Student created user_id=1 student_id=1
+2026-11-16 05:34:40,214 INFO sams.students Student created user_id=1 student_id=2
+2026-11-16 05:34:40,230 INFO sams.students Student created user_id=1 student_id=3
+2026-11-16 05:34:41,070 INFO sams.attendance Attendance submitted user_id=2 class_id=1 date=2026-10-26 record_count=3
+2026-11-16 05:34:41,074 INFO sams.notifications Notification skipped, no parent email notification_id=1 student_id=2
+2026-11-16 05:34:41,089 INFO sams.attendance Attendance edited user_id=2 attendance_id=2 class_id=1 old_status=Absent new_status=Excused
+ok
+test_second_submission_for_same_class_and_date_is_blocked (sams_project.tests_integration.CrossModuleFlowTests.test_second_submission_for_same_class_and_date_is_blocked) ... 2026-11-16 05:34:44,125 INFO sams.students Class created user_id=1 record_id=1
+2026-11-16 05:34:44,136 INFO sams.students Section created user_id=1 record_id=1
+2026-11-16 05:34:44,147 INFO sams.students Student created user_id=1 student_id=1
+2026-11-16 05:34:44,157 INFO sams.students Student created user_id=1 student_id=2
+2026-11-16 05:34:44,167 INFO sams.students Student created user_id=1 student_id=3
+2026-11-16 05:34:44,943 INFO sams.attendance Attendance submitted user_id=2 class_id=1 date=2026-10-26 record_count=3
+2026-11-16 05:34:44,958 INFO sams.attendance Attendance submission rejected: already marked user_id=2 class_id=1 date=2026-10-26
+2026-11-16 05:34:44,959 WARNING sams.attendance Attendance API request failed user_id=2 status=409
+ok
+test_unassigned_teacher_cannot_mark_or_edit (sams_project.tests_integration.CrossModuleFlowTests.test_unassigned_teacher_cannot_mark_or_edit) ... 2026-11-16 05:34:47,976 INFO sams.students Class created user_id=1 record_id=1
+2026-11-16 05:34:47,993 INFO sams.students Section created user_id=1 record_id=1
+2026-11-16 05:34:48,014 INFO sams.students Student created user_id=1 student_id=1
+2026-11-16 05:34:48,031 INFO sams.students Student created user_id=1 student_id=2
+2026-11-16 05:34:48,047 INFO sams.students Student created user_id=1 student_id=3
+2026-11-16 05:34:49,487 WARNING sams.attendance Attendance submission rejected: unassigned teacher user_id=3 class_id=1
+2026-11-16 05:34:49,487 WARNING sams.attendance Attendance API request failed user_id=3 status=403
+2026-11-16 05:34:49,499 INFO sams.attendance Attendance submitted user_id=2 class_id=1 date=2026-10-26 record_count=3
+2026-11-16 05:34:49,508 WARNING sams.attendance Attendance edit rejected: unassigned teacher user_id=3 attendance_id=1
+ok
+test_not_found_page_uses_shared_layout (sams_project.tests_integration.ErrorPagesIntegrationTests.test_not_found_page_uses_shared_layout) ... ok
+test_parent_sees_styled_403_on_blocked_admin_pages (sams_project.tests_integration.ErrorPagesIntegrationTests.test_parent_sees_styled_403_on_blocked_admin_pages) ... ok
+test_login_has_forgot_password_link (sams_project.tests_integration.PasswordResetIntegrationTests.test_login_has_forgot_password_link) ... ok
+test_password_reset_link_sets_new_password_for_login (sams_project.tests_integration.PasswordResetIntegrationTests.test_password_reset_link_sets_new_password_for_login) ... ok
+test_reset_request_sends_email_and_uses_generic_confirmation (sams_project.tests_integration.PasswordResetIntegrationTests.test_reset_request_sends_email_and_uses_generic_confirmation) ... ok
+test_admin_can_import_supported_excel_file (students.tests.BulkStudentImportTests.test_admin_can_import_supported_excel_file) ... 2026-11-16 05:34:56,599 INFO sams.students Student import completed user_id=1 imported_count=1
+ok
+test_admin_can_import_valid_csv (students.tests.BulkStudentImportTests.test_admin_can_import_valid_csv) ... 2026-11-16 05:34:58,164 INFO sams.students Student import completed user_id=1 imported_count=1
+ok
+test_duplicate_roll_numbers_are_skipped_and_reported (students.tests.BulkStudentImportTests.test_duplicate_roll_numbers_are_skipped_and_reported) ... 2026-11-16 05:34:59,707 WARNING sams.students Student import completed with rejected rows user_id=1 imported_count=1 failure_count=1
+ok
+test_empty_file_is_rejected_without_writes (students.tests.BulkStudentImportTests.test_empty_file_is_rejected_without_writes) ... ok
+test_header_only_file_is_rejected_without_writes (students.tests.BulkStudentImportTests.test_header_only_file_is_rejected_without_writes) ... ok
+test_malformed_excel_file_is_rejected_without_writes (students.tests.BulkStudentImportTests.test_malformed_excel_file_is_rejected_without_writes) ... ok
+test_missing_headers_and_invalid_values_are_rejected (students.tests.BulkStudentImportTests.test_missing_headers_and_invalid_values_are_rejected) ... 2026-11-16 05:35:05,709 WARNING sams.students Student import completed with rejected rows user_id=1 imported_count=0 failure_count=1
+ok
+test_missing_required_row_is_skipped_while_valid_rows_are_saved (students.tests.BulkStudentImportTests.test_missing_required_row_is_skipped_while_valid_rows_are_saved) ... 2026-11-16 05:35:07,237 WARNING sams.students Student import completed with rejected rows user_id=1 imported_count=1 failure_count=1
+ok
+test_multiple_invalid_rows_report_physical_file_rows (students.tests.BulkStudentImportTests.test_multiple_invalid_rows_report_physical_file_rows) ... 2026-11-16 05:35:08,748 WARNING sams.students Student import completed with rejected rows user_id=1 imported_count=0 failure_count=2
+ok
+test_non_admin_and_unauthenticated_users_cannot_import (students.tests.BulkStudentImportTests.test_non_admin_and_unauthenticated_users_cannot_import) ... ok
+test_unknown_class_or_section_is_rejected_without_writes (students.tests.BulkStudentImportTests.test_unknown_class_or_section_is_rejected_without_writes) ... 2026-11-16 05:35:11,840 WARNING sams.students Student import completed with rejected rows user_id=1 imported_count=0 failure_count=1
+ok
+test_unsupported_file_type_is_rejected (students.tests.BulkStudentImportTests.test_unsupported_file_type_is_rejected) ... ok
+test_csv_import_takes_the_class_from_the_section (students.tests.ClassComesFromSectionTests.test_csv_import_takes_the_class_from_the_section) ... 2026-11-16 05:35:18,732 INFO sams.students Student import completed user_id=1 imported_count=1
+ok
+test_form_and_model_no_longer_have_a_typed_class_field (students.tests.ClassComesFromSectionTests.test_form_and_model_no_longer_have_a_typed_class_field) ... ok
+test_moving_section_changes_the_class_everywhere (students.tests.ClassComesFromSectionTests.test_moving_section_changes_the_class_everywhere) ... ok
+test_reports_show_the_class_from_the_section (students.tests.ClassComesFromSectionTests.test_reports_show_the_class_from_the_section) ... ok
+test_student_list_and_detail_show_the_class_from_the_section (students.tests.ClassComesFromSectionTests.test_student_list_and_detail_show_the_class_from_the_section) ... ok
+test_typed_class_sent_by_a_form_post_is_ignored (students.tests.ClassComesFromSectionTests.test_typed_class_sent_by_a_form_post_is_ignored) ... 2026-11-16 05:35:30,529 INFO sams.students Student created user_id=1 student_id=2
+ok
+test_add_section_from_class_page_prefills_and_returns_to_class (students.tests.ClassDrillDownTests.test_add_section_from_class_page_prefills_and_returns_to_class) ... 2026-11-16 05:35:31,338 INFO sams.students Section created user_id=1 record_id=2
+ok
+test_class_list_shows_counts_and_links_to_class (students.tests.ClassDrillDownTests.test_class_list_shows_counts_and_links_to_class) ... ok
+test_class_page_lists_sections_and_students (students.tests.ClassDrillDownTests.test_class_page_lists_sections_and_students) ... ok
+test_old_sections_list_redirects_to_classes (students.tests.ClassDrillDownTests.test_old_sections_list_redirects_to_classes) ... ok
+test_section_page_lists_its_students (students.tests.ClassDrillDownTests.test_section_page_lists_its_students) ... ok
+test_admin_can_create_view_update_and_delete_records (students.tests.ClassSectionSubjectTests.test_admin_can_create_view_update_and_delete_records) ... 2026-11-16 05:35:36,778 INFO sams.students Class created user_id=1 record_id=1
+2026-11-16 05:35:36,811 INFO sams.students Section created user_id=1 record_id=1
+2026-11-16 05:35:36,826 INFO sams.students Section updated user_id=1 record_id=1
+2026-11-16 05:35:36,839 INFO sams.students Subject created user_id=1 record_id=1
+2026-11-16 05:35:36,871 INFO sams.students Subject deleted user_id=1 record_id=1
+2026-11-16 05:35:36,884 INFO sams.students Section deleted user_id=1 record_id=1
+2026-11-16 05:35:36,897 INFO sams.students Class deleted user_id=1 record_id=1
+ok
+test_class_can_be_created_without_a_teacher (students.tests.ClassSectionSubjectTests.test_class_can_be_created_without_a_teacher) ... ok
+test_class_form_only_lists_teachers_and_persists_assignment (students.tests.ClassSectionSubjectTests.test_class_form_only_lists_teachers_and_persists_assignment) ... 2026-11-16 05:35:41,471 INFO sams.students Class created user_id=1 record_id=1
+ok
+test_duplicate_class_section_combination_is_rejected (students.tests.ClassSectionSubjectTests.test_duplicate_class_section_combination_is_rejected) ... ok
+test_editing_class_displays_and_changes_teacher (students.tests.ClassSectionSubjectTests.test_editing_class_displays_and_changes_teacher) ... 2026-11-16 05:35:46,881 INFO sams.students Class updated user_id=1 record_id=1
+ok
+test_invalid_catalog_data_is_rejected (students.tests.ClassSectionSubjectTests.test_invalid_catalog_data_is_rejected) ... ok
+test_model_rejects_non_teacher_class_teacher (students.tests.ClassSectionSubjectTests.test_model_rejects_non_teacher_class_teacher) ... ok
+test_non_admin_cannot_manage_classes_sections_or_subjects (students.tests.ClassSectionSubjectTests.test_non_admin_cannot_manage_classes_sections_or_subjects) ... ok
+test_student_can_reference_section_and_section_deletion_is_protected (students.tests.ClassSectionSubjectTests.test_student_can_reference_section_and_section_deletion_is_protected) ... ok
+test_unauthenticated_catalog_access_redirects_to_login (students.tests.ClassSectionSubjectTests.test_unauthenticated_catalog_access_redirects_to_login) ... ok
+test_all_student_and_catalog_templates_use_shared_authenticated_layout (students.tests.SharedLayoutIntegrationTests.test_all_student_and_catalog_templates_use_shared_authenticated_layout) ... ok
+test_filter_by_class_and_section (students.tests.StudentListFilterSortTests.test_filter_by_class_and_section) ... ok
+test_list_shows_percentage (students.tests.StudentListFilterSortTests.test_list_shows_percentage) ... ok
+test_sort_by_attendance_percentage_both_ways (students.tests.StudentListFilterSortTests.test_sort_by_attendance_percentage_both_ways) ... ok
+test_admin_links_a_parent_when_creating_a_student (students.tests.StudentParentFieldTests.test_admin_links_a_parent_when_creating_a_student) ... 2026-11-16 05:36:06,102 INFO sams.students Student created user_id=1 student_id=1
+ok
+test_form_offers_only_parent_accounts (students.tests.StudentParentFieldTests.test_form_offers_only_parent_accounts) ... ok
+test_parent_is_optional (students.tests.StudentParentFieldTests.test_parent_is_optional) ... 2026-11-16 05:36:10,600 INFO sams.students Student created user_id=1 student_id=1
+ok
+test_admin_can_delete_student (students.tests.StudentProfileTests.test_admin_can_delete_student) ... 2026-11-16 05:36:12,809 INFO sams.students Student deleted user_id=1 student_id=1
+ok
+test_admin_can_update_student (students.tests.StudentProfileTests.test_admin_can_update_student) ... 2026-11-16 05:36:15,073 INFO sams.students Student updated user_id=1 student_id=1
+ok
+test_admin_creates_student_successfully (students.tests.StudentProfileTests.test_admin_creates_student_successfully) ... 2026-11-16 05:36:17,317 INFO sams.students Student created user_id=1 student_id=2
+ok
+test_duplicate_roll_numbers_are_rejected (students.tests.StudentProfileTests.test_duplicate_roll_numbers_are_rejected) ... ok
+test_invalid_or_missing_required_data_is_rejected (students.tests.StudentProfileTests.test_invalid_or_missing_required_data_is_rejected) ... ok
+test_model_validates_required_fields (students.tests.StudentProfileTests.test_model_validates_required_fields) ... ok
+test_non_admin_cannot_create_edit_or_delete_student_profiles (students.tests.StudentProfileTests.test_non_admin_cannot_create_edit_or_delete_student_profiles) ... ok
+test_student_profiles_can_be_listed_and_viewed (students.tests.StudentProfileTests.test_student_profiles_can_be_listed_and_viewed) ... ok
+test_teacher_receives_403_from_admin_only_endpoint (students.tests.StudentProfileTests.test_teacher_receives_403_from_admin_only_endpoint) ... ok
+test_unauthenticated_access_is_handled_according_to_rules (students.tests.StudentProfileTests.test_unauthenticated_access_is_handled_according_to_rules) ... ok
+test_admin_sees_existing_students_without_a_section (students.tests.StudentSectionRequiredTests.test_admin_sees_existing_students_without_a_section) ... ok
+test_csv_row_without_a_section_is_rejected (students.tests.StudentSectionRequiredTests.test_csv_row_without_a_section_is_rejected) ... 2026-11-16 05:36:36,370 WARNING sams.students Student import completed with rejected rows user_id=1 imported_count=1 failure_count=1
+ok
+test_csv_without_a_section_column_is_rejected (students.tests.StudentSectionRequiredTests.test_csv_without_a_section_column_is_rejected) ... ok
+test_model_validation_requires_a_section (students.tests.StudentSectionRequiredTests.test_model_validation_requires_a_section) ... ok
+test_removing_the_section_from_an_existing_student_is_rejected (students.tests.StudentSectionRequiredTests.test_removing_the_section_from_an_existing_student_is_rejected) ... ok
+test_saving_a_student_without_a_section_fails_with_a_clear_error (students.tests.StudentSectionRequiredTests.test_saving_a_student_without_a_section_fails_with_a_clear_error) ... ok
+test_section_warning_is_hidden_when_every_student_has_a_section (students.tests.StudentSectionRequiredTests.test_section_warning_is_hidden_when_every_student_has_a_section) ... ok
+test_student_saved_with_a_section_appears_on_mark_attendance (students.tests.StudentSectionRequiredTests.test_student_saved_with_a_section_appears_on_mark_attendance) ... 2026-11-16 05:36:45,481 INFO sams.students Student created user_id=1 student_id=1
+ok
+test_teachers_do_not_see_the_admin_section_warning (students.tests.StudentSectionRequiredTests.test_teachers_do_not_see_the_admin_section_warning) ... ok
+test_migration_can_be_reversed (students.test_migrations.RemoveStudentClassMigrationTests.test_migration_can_be_reversed) ... ok
+test_migration_stops_without_changes_when_a_section_is_unclear (students.test_migrations.RemoveStudentClassMigrationTests.test_migration_stops_without_changes_when_a_section_is_unclear) ... ok
+test_students_with_one_possible_section_are_placed_in_it (students.test_migrations.RemoveStudentClassMigrationTests.test_students_with_one_possible_section_are_placed_in_it) ... ok
+
+----------------------------------------------------------------------
+Ran 257 tests in 513.069s
+
+OK
+Destroying test database for alias 'default' ('file:memorydb_default?mode=memory&cache=shared')...
+ OK
+System check identified no issues (0 silenced).

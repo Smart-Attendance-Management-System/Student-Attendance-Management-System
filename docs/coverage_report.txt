@@ -1,0 +1,70 @@
+Name                                                                                 Stmts   Miss Branch BrPart  Cover   Missing
+--------------------------------------------------------------------------------------------------------------------------------
+accounts\__init__.py                                                                     0      0      0      0   100%
+accounts\admin.py                                                                        8      0      0      0   100%
+accounts\apps.py                                                                         3      0      0      0   100%
+accounts\forms.py                                                                       28      0      8      1    97%   37->40
+accounts\migrations\0001_initial.py                                                      8      0      0      0   100%
+accounts\migrations\__init__.py                                                          0      0      0      0   100%
+accounts\models.py                                                                      10      0      0      0   100%
+accounts\permissions.py                                                                 11      0      0      0   100%
+accounts\tests.py                                                                      154      0     10      0   100%
+accounts\urls.py                                                                         4      0      0      0   100%
+accounts\views.py                                                                       65      5     12      3    90%   59, 79-80, 86, 99
+attendance\__init__.py                                                                   0      0      0      0   100%
+attendance\admin.py                                                                     13      1      2      1    87%   22
+attendance\apps.py                                                                       3      0      0      0   100%
+attendance\exports.py                                                                   94      2     28      2    97%   21, 165
+attendance\management\__init__.py                                                        0      0      0      0   100%
+attendance\management\commands\__init__.py                                               0      0      0      0   100%
+attendance\management\commands\backup_database.py                                      104     63     24      0    32%   19-34, 41-45, 48-67, 70-98, 102-104, 108-109, 113-114, 140-144, 147-148, 159-168, 177-179
+attendance\migrations\0001_initial.py                                                    7      0      0      0   100%
+attendance\migrations\0002_attendance_class_date_index.py                                5      0      0      0   100%
+attendance\migrations\__init__.py                                                        0      0      0      0   100%
+attendance\models.py                                                                    22      0      0      0   100%
+attendance\services.py                                                                 209     10     84      7    94%   61-62, 81-86, 185, 211->213, 238-239, 241, 294, 310
+attendance\tests.py                                                                    676      0     24      0   100%
+attendance\urls.py                                                                       4      0      0      0   100%
+attendance\views.py                                                                    121      7     24      4    92%   25-26, 66, 71, 126, 162, 230
+manage.py                                                                               11      2      2      1    77%   12-13, 21->exit
+notifications\__init__.py                                                                0      0      0      0   100%
+notifications\admin.py                                                                  14      0      0      0   100%
+notifications\apps.py                                                                    3      0      0      0   100%
+notifications\migrations\0001_initial.py                                                 7      0      0      0   100%
+notifications\migrations\0002_notification.py                                            5      0      0      0   100%
+notifications\migrations\0003_notification_retries.py                                    5      0      0      0   100%
+notifications\migrations\__init__.py                                                     0      0      0      0   100%
+notifications\models.py                                                                 48      4      0      0    92%   27, 69, 95-96
+notifications\services.py                                                              110      4     28      5    93%   73->75, 75->78, 106, 127-128, 189
+notifications\tests.py                                                                 257      0      6      0   100%
+notifications\urls.py                                                                    4      0      0      0   100%
+notifications\views.py                                                                  38      0      2      0   100%
+pages\__init__.py                                                                        0      0      0      0   100%
+pages\admin.py                                                                           1      0      0      0   100%
+pages\apps.py                                                                            3      0      0      0   100%
+pages\migrations\__init__.py                                                             0      0      0      0   100%
+pages\models.py                                                                          1      0      0      0   100%
+pages\tests.py                                                                         396      0     24      0   100%
+pages\urls.py                                                                            4      0      0      0   100%
+pages\views.py                                                                          69      0     16      0   100%
+sams_project\__init__.py                                                                 0      0      0      0   100%
+sams_project\settings.py                                                                61     14     20      8    68%   30, 40, 44, 73, 148-162, 220, 240, 262
+sams_project\tests_integration.py                                                      216      0      6      0   100%
+sams_project\urls.py                                                                    12      0      0      0   100%
+students\__init__.py                                                                     0      0      0      0   100%
+students\admin.py                                                                       20      0      0      0   100%
+students\apps.py                                                                         3      0      0      0   100%
+students\bulk_import.py                                                                134     21     48     12    82%   40, 42, 49-50, 72, 82, 87, 89, 97-98, 108, 128, 166-172, 183-189, 208-213, 222-223
+students\forms.py                                                                       33      0      0      0   100%
+students\migrations\0001_initial.py                                                      5      0      0      0   100%
+students\migrations\0002_academicclass_subject_section_student_section_and_more.py       5      0      0      0   100%
+students\migrations\0003_academicclass_class_teacher.py                                  6      0      0      0   100%
+students\migrations\0004_student_parent.py                                               6      0      0      0   100%
+students\migrations\0005_remove_student_student_class.py                                25      0     10      1    97%   56->55
+students\migrations\__init__.py                                                          0      0      0      0   100%
+students\models.py                                                                      73      7     22      7    85%   54, 70, 72, 122, 124, 126, 137
+students\test_migrations.py                                                             50      0      0      0   100%
+students\tests.py                                                                      495      0     12      0   100%
+students\views.py                                                                      272     23     46      8    90%   23, 35, 40, 56-57, 107, 127, 170-171, 178, 203, 251-252, 289, 304-305, 328-329, 463-464, 481-482, 487
+--------------------------------------------------------------------------------------------------------------------------------
+TOTAL                                                                                 3941    163    458     60    94%
